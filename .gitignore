@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environment
+.manim/
+venv/
+.venv/
+
+# Manim generated files
+media/
+
+# IDE & Editor
+.vscode/
+.vscode-server/
+.idea/
+*.swp
+*.swo
+
+# Shell history
+.bash_history
+.zsh_history
+
+# Cache
+.cache/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

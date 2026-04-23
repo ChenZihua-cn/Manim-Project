@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(GIT_DIR=\"d:/30856/Manim/Project/.git\" GIT_WORK_TREE=\"d:/30856/Manim/Project\" git log --oneline -10)"
+    ]
+  }
+}
