@@ -1,0 +1,1 @@
+docker run -d  --name Physics -v "D:/30856/Manim/Project:/manim" --restart unless-stopped  manimcommunity/manim:stable  tail -f /dev/null
