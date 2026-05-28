@@ -438,125 +438,165 @@ class Scene3_ExponentialPauliRepulsion(Scene):
 # =============================================================================
 class Scene4_FrequencyShiftDetection(Scene):
     """
-    展示AFM探针在样品表面扫描成像：
-    探针沿表面行进，悬臂梁随形貌起伏偏转，
-    激光反射至四象限探测器，实时绘制形貌曲线。
-    时长：~8秒
+    展示AFM探针扫描成像原理：
+    悬臂梁左端固定、右端探针接触表面，样品表面向左移动，
+    探针随表面形貌起伏偏转，激光反射至四象限探测器，
+    实时绘制形貌曲线。时长：~9秒
     """
 
     def construct(self):
-        # ---- 表面形貌定义 ----
+        # ---- 表面形貌定义（延展范围供滚动） ----
         def surface_profile(x):
-            """样品表面：多个不同高度和宽度的特征"""
             h = 0.0
-            h += 0.25 * np.exp(-((x + 1.5) ** 2) / 0.25)   # 左凸起
-            h += 0.35 * np.exp(-((x - 0.3) ** 2) / 0.15)    # 中央尖峰
-            h += 0.20 * np.exp(-((x - 2.0) ** 2) / 0.40)    # 右宽凸起
+            h += 0.25 * np.exp(-((x - 1.5) ** 2) / 0.25)   # 左凸起
+            h += 0.35 * np.exp(-((x - 3.3) ** 2) / 0.15)    # 中央尖峰
+            h += 0.20 * np.exp(-((x - 5.0) ** 2) / 0.40)    # 右宽凸起
+            h += 0.18 * np.exp(-((x - 6.5) ** 2) / 0.30)    # 尾部小凸起
             return h
 
-        # ========== 1. 样品表面 (0-1.5s) ==========
-        n_pts = 300
-        pts = []
-        for i in range(n_pts):
-            sx = -4.0 + 8.0 * i / (n_pts - 1)
-            pts.append([sx, -1.0 + surface_profile(sx), 0])
+        # ---- ValueTracker：表面左移量 ----
+        surface_shift = ValueTracker(0)
+        SCAN_RANGE = 6.0  # 总扫描距离
 
+        # ========== 1. 动态表面 (0-1.5s) ==========
+        # 表面曲线 — updater 每帧根据 surface_shift 重新计算点位
         surface = VMobject()
-        surface.set_points_as_corners(pts)
         surface.set_stroke(color=COLOR_DETECTOR, width=3)
 
-        fill_pts = pts + [[4.0, -3, 0], [-4.0, -3, 0]]
-        surface_fill = Polygon(*fill_pts, color=COLOR_DETECTOR,
-                               fill_opacity=0.12, stroke_width=0)
+        def update_surface(mob):
+            shift = surface_shift.get_value()
+            n = 200
+            pts = []
+            for i in range(n):
+                sx = -4.0 + 8.0 * i / (n - 1)
+                pts.append([sx, -0.4 + surface_profile(sx + shift), 0])
+            mob.set_points_as_corners(pts)
+
+        surface.add_updater(update_surface)
+
+        # 表面下方半透明填充
+        n_init = 200
+        init_fill_pts = []
+        for i in range(n_init):
+            sx = -4.0 + 8.0 * i / (n_init - 1)
+            init_fill_pts.append([sx, -0.4 + surface_profile(sx), 0])
+        init_fill_pts = init_fill_pts + [[4.0, -3, 0], [-4.0, -3, 0]]
+
+        surface_fill = Polygon(*init_fill_pts,
+                               color=COLOR_DETECTOR, fill_opacity=0.12,
+                               stroke_width=0)
+
+        def update_surface_fill(mob):
+            shift = surface_shift.get_value()
+            n = 200
+            pts = []
+            for i in range(n):
+                sx = -4.0 + 8.0 * i / (n - 1)
+                pts.append([sx, -0.4 + surface_profile(sx + shift), 0])
+            pts = pts + [[4.0, -3, 0], [-4.0, -3, 0]]
+            mob.set_points_as_corners(pts)
+
+        surface_fill.add_updater(update_surface_fill)
 
         surface_label = Text("样品表面", font_size=22, color=COLOR_DETECTOR)
         surface_label.to_edge(DOWN).shift(UP * 0.15)
 
-        scan_arrow = Arrow((-3.5, -2.2, 0), (-1.5, -2.2, 0),
+        # 表面移动方向指示
+        move_arrow = Arrow((-0.5, -2.2, 0), (-2.5, -2.2, 0),
                            color=WHITE, buff=0.1, stroke_width=2)
-        scan_dir_label = Text("扫描方向 →", font_size=18, color=WHITE)
-        scan_dir_label.next_to(scan_arrow, DOWN, buff=0.1)
+        move_label = Text("表面移动 ←", font_size=18, color=WHITE)
+        move_label.next_to(move_arrow, DOWN, buff=0.1)
 
-        self.play(Create(surface), FadeIn(surface_fill),
-                  Write(surface_label), run_time=1)
-        self.play(GrowArrow(scan_arrow), Write(scan_dir_label), run_time=0.5)
+        self.add(surface, surface_fill)
+        self.play(Write(surface_label), GrowArrow(move_arrow),
+                  Write(move_label), run_time=1)
+        self.wait(0.5)
+        self.play(FadeOut(move_arrow), FadeOut(move_label))
 
-        # ========== 2. 探针 + 探测器系统 (1.5-3s) ==========
-        scan_x = ValueTracker(-3.0)
+        # ========== 2. 悬臂梁 + 探针 (1.5-3s) ==========
+        # 悬臂梁：左端固定在 (-3, 0)，右端在 (0, tip_y) 随表面起伏
+        cantilever_base = Line((-3, 0, 0), (0, 0, 0), color=GREY, stroke_width=8)
+        tip_shape = Polygon(
+            (-0.12, 0, 0), (0.12, 0, 0), (0, -0.4, 0),
+            color=GREY, fill_opacity=1
+        )
+        cantilever = VGroup(cantilever_base, tip_shape)
 
-        def make_cantilever():
-            x = scan_x.get_value()
-            sy = -1.0 + surface_profile(x)
-            base = np.array([x - 1.0, 0.0, 0])
-            tip_contact = np.array([x, sy, 0])
-            beam = Line(base, tip_contact, color=GREY, stroke_width=6)
-            tip = Polygon(
-                (x - 0.06, sy + 0.08, 0),
-                (x + 0.06, sy + 0.08, 0),
-                (x, sy, 0),
+        def update_cantilever(mob):
+            shift = surface_shift.get_value()
+            tip_y = surface_profile(shift)
+            new_base = Line((-3, 0, 0), (0, tip_y, 0),
+                            color=GREY, stroke_width=8)
+            new_tip = Polygon(
+                (-0.12, tip_y, 0), (0.12, tip_y, 0), (0, tip_y - 0.4, 0),
                 color=GREY, fill_opacity=1
             )
-            return VGroup(beam, tip)
+            mob.become(VGroup(new_base, new_tip))
 
-        cantilever = always_redraw(make_cantilever)
+        cantilever.add_updater(update_cantilever)
 
-        # 四象限探测器
-        detector = Rectangle(width=1.0, height=1.4,
+        # 四象限探测器（右侧）
+        detector = Rectangle(width=1.2, height=1.2,
                              color=COLOR_DETECTOR, stroke_width=2)
-        detector.move_to((5.0, 1.8, 0))
-        cross_h = Line((4.5, 1.8, 0), (5.5, 1.8, 0),
-                       color=GREY, stroke_width=1)
-        cross_v = Line((5.0, 1.1, 0), (5.0, 2.5, 0),
-                       color=GREY, stroke_width=1)
-        det_label = Text("四象限\n探测器", font_size=16,
-                         color=COLOR_DETECTOR, line_spacing=0.5)
-        det_label.next_to(detector, UP, buff=0.1)
-
-        # 激光光路
-        def make_laser_in():
-            x = scan_x.get_value()
-            sy = -1.0 + surface_profile(x)
-            reflect = np.array([x, sy + 0.04, 0])
-            return Arrow((-2, 3.0, 0), reflect,
-                         color=COLOR_LASER, buff=0, stroke_width=2,
-                         max_tip_length_to_length_ratio=0.08)
-
-        def make_laser_out():
-            x = scan_x.get_value()
-            sy = -1.0 + surface_profile(x)
-            reflect = np.array([x, sy + 0.04, 0])
-            deflection = surface_profile(x)
-            spot_y = 1.8 + deflection * 2.0
-            spot_y = np.clip(spot_y, 1.15, 2.45)
-            return Arrow(reflect, (5.0, spot_y, 0),
-                         color=COLOR_LASER, buff=0, stroke_width=2,
-                         max_tip_length_to_length_ratio=0.08)
-
-        def make_spot():
-            x = scan_x.get_value()
-            deflection = surface_profile(x)
-            spot_y = 1.8 + deflection * 2.0
-            spot_y = np.clip(spot_y, 1.15, 2.45)
-            return Dot((5.0, spot_y, 0),
-                       color=COLOR_EQUILIBRIUM, radius=0.08)
-
-        laser_in = always_redraw(make_laser_in)
-        laser_out = always_redraw(make_laser_out)
-        spot = always_redraw(make_spot)
-
-        self.play(
-            FadeIn(detector), FadeIn(cross_h), FadeIn(cross_v),
-            Write(det_label), run_time=0.5
+        detector.move_to((3, 1.8, 0))
+        cross = VGroup(
+            Line((3, 1.2, 0), (3, 2.4, 0), color=GREY, stroke_width=1),
+            Line((2.4, 1.8, 0), (3.6, 1.8, 0), color=GREY, stroke_width=1)
         )
-        self.add(cantilever, laser_in, laser_out, spot)
+        detector_label = Text("四象限探测器", font_size=20, color=COLOR_DETECTOR)
+        detector_label.next_to(detector, UP, buff=0.2)
+
+        # 激光入射 — 从光源射向悬臂梁背面反射点
+        laser_in = Arrow((-3.5, 1.5, 0), (0, 0.1, 0),
+                         color=COLOR_LASER, buff=0, stroke_width=2)
+
+        def update_laser_in(mob):
+            shift = surface_shift.get_value()
+            tip_y = surface_profile(shift)
+            reflect = np.array([0, tip_y + 0.1, 0])
+            mob.become(Arrow((-3.5, 1.5, 0), reflect,
+                             color=COLOR_LASER, buff=0, stroke_width=2))
+
+        laser_in.add_updater(update_laser_in)
+
+        # 激光反射 — 从反射点射向探测器，偏转角度随悬臂梁倾斜变化
+        laser_out = Arrow((0, 0.1, 0), (3, 1.8, 0),
+                          color=COLOR_LASER, buff=0, stroke_width=2)
+
+        def update_laser_out(mob):
+            shift = surface_shift.get_value()
+            tip_y = surface_profile(shift)
+            reflect = np.array([0, tip_y + 0.1, 0])
+            spot_y = 1.8 + tip_y * 1.0
+            spot_y = np.clip(spot_y, 1.2, 2.4)
+            mob.become(Arrow(reflect, (3, spot_y, 0),
+                             color=COLOR_LASER, buff=0, stroke_width=2))
+
+        laser_out.add_updater(update_laser_out)
+
+        # 探测器上光斑
+        spot = Dot((3, 1.8, 0), color=COLOR_EQUILIBRIUM, radius=0.08)
+
+        def update_spot(mob):
+            shift = surface_shift.get_value()
+            tip_y = surface_profile(shift)
+            spot_y = 1.8 + tip_y * 1.0
+            spot_y = np.clip(spot_y, 1.2, 2.4)
+            mob.move_to((3, spot_y, 0))
+
+        spot.add_updater(update_spot)
+
+        self.add(cantilever, detector, cross, detector_label)
+        self.add(laser_in, laser_out, spot)
         self.wait(0.5)
 
         # ========== 3. 形貌追踪图 (3-3.5s) ==========
         topo_axes = Axes(
-            x_range=[-3, 3, 1], y_range=[0, 0.6, 0.2],
+            x_range=[0, SCAN_RANGE, 1],
+            y_range=[0, 0.6, 0.2],
             x_length=5.5, y_length=1.2,
             axis_config={"include_tip": False, "stroke_width": 1},
-            x_axis_config={"numbers_to_include": [-3, 0, 3], "font_size": 16},
+            x_axis_config={"numbers_to_include": [0, 2, 4, 6], "font_size": 16},
             y_axis_config={"numbers_to_include": [0, 0.3, 0.6], "font_size": 16}
         ).to_corner(DL).shift(RIGHT * 0.4 + UP * 0.3)
 
@@ -567,27 +607,30 @@ class Scene4_FrequencyShiftDetection(Scene):
         topo_trace.set_stroke(color=COLOR_EQUILIBRIUM, width=2.5)
 
         def update_topo(mob):
-            x = scan_x.get_value()
-            n = max(2, int((x + 3) / 6 * 120))
-            trace_pts = []
+            shift = surface_shift.get_value()
+            if shift <= 0.01:
+                mob.set_points_as_corners([topo_axes.c2p(0, 0)])
+                return
+            n = max(2, int(shift / SCAN_RANGE * 150))
+            pts = []
             for i in range(n + 1):
-                tx = -3.0 + 6.0 * i / max(n, 1)
-                trace_pts.append(topo_axes.c2p(tx, surface_profile(tx)))
-            if len(trace_pts) >= 2:
-                mob.set_points_as_corners(trace_pts)
+                tx = shift * i / max(n, 1)
+                pts.append(topo_axes.c2p(tx, surface_profile(tx)))
+            if len(pts) >= 2:
+                mob.set_points_as_corners(pts)
 
         topo_trace.add_updater(update_topo)
 
         self.play(Create(topo_axes), Write(topo_title), run_time=0.5)
         self.add(topo_trace)
 
-        # ========== 4. 扫描行进 (3.5-7.5s) ==========
+        # ========== 4. 表面左移扫描 (3.5-8s) ==========
         scan_label = Text("▶ 扫描中...", font_size=24, color=WHITE)
         scan_label.to_corner(UR).shift(LEFT * 0.5)
         self.add(scan_label)
 
-        self.play(scan_x.animate.set_value(3.0),
-                  run_time=4, rate_func=linear)
+        self.play(surface_shift.animate.set_value(SCAN_RANGE),
+                  run_time=4.5, rate_func=linear)
 
         topo_trace.remove_updater(update_topo)
 
@@ -599,9 +642,9 @@ class Scene4_FrequencyShiftDetection(Scene):
         # ========== 5. 转场淡出 ==========
         self.play(
             FadeOut(surface), FadeOut(surface_fill), FadeOut(surface_label),
-            FadeOut(scan_arrow), FadeOut(scan_dir_label),
-            FadeOut(cantilever), FadeOut(detector),
-            FadeOut(cross_h), FadeOut(cross_v), FadeOut(det_label),
+            
+            FadeOut(cantilever), FadeOut(detector), FadeOut(cross),
+            FadeOut(detector_label),
             FadeOut(laser_in), FadeOut(laser_out), FadeOut(spot),
             FadeOut(scan_label),
             FadeOut(topo_axes), FadeOut(topo_title), FadeOut(topo_trace),
