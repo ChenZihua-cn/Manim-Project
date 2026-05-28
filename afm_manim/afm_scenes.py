@@ -6,6 +6,7 @@
 
 # trunk-ignore(ruff/F403)
 # pyright: ignore[reportWildcardImportFromLibrary]
+
 from manim import *
 import numpy as np
 
