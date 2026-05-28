@@ -456,9 +456,11 @@ class Scene4_FrequencyShiftDetection(Scene):
         # 组合悬臂梁和探针
         cantilever = VGroup(cantilever_base, tip_shape)
         
-        # 激光路径（入射到悬臂梁反射点，反射点跟随振动）
+        # 激光路径（入射到悬臂梁反射点，反射点跟随振动）—— 初始隐藏
         laser_in = Arrow((-3.5, 1.5, 0), (0, 0.15, 0), color=COLOR_LASER, buff=0)
         laser_out = Arrow((0, 0.15, 0), (3, 1.8, 0), color=COLOR_LASER, buff=0)
+        laser_in.set_stroke(opacity=0)
+        laser_out.set_stroke(opacity=0)
         
         # 四象限探测器
         detector = Rectangle(width=1.2, height=1.2, color=COLOR_DETECTOR, stroke_width=2)
@@ -474,11 +476,14 @@ class Scene4_FrequencyShiftDetection(Scene):
         detector_label = Text("四象限探测器", font_size=20, color=COLOR_DETECTOR)
         detector_label.next_to(detector, UP, buff=0.2)
         
-        self.add(cantilever, laser_in, laser_out, detector, cross, detector_label)
-        
-        # 2. 悬臂梁振动动画（1-3秒）
+        self.add(cantilever, detector, cross, detector_label)
+
+        # 2. 初始静止展示（0-1秒）—— 激光箭头不显示
+        self.wait(1)
+
+        # 3. 悬臂梁振动 + 激光 + 探针尖端表面波（1-3秒）
         vibrate = ValueTracker(0)
-        
+
         def update_cantilever(mob):
             offset = 0.15 * np.sin(10 * vibrate.get_value())
             # 以悬臂梁左端为支点，右端上下振动
@@ -489,12 +494,40 @@ class Scene4_FrequencyShiftDetection(Scene):
                 color=GREY, fill_opacity=1
             )
             mob.become(VGroup(new_base, new_tip))
-        
+
+        # 探针尖端不平整表面 —— 移动波 sin(ωt - kx)
+        n_wave_pts = 25
+        wave_k = 20
+        wave_omega = 8 * PI
+        wave_dots = VGroup()
+        for i in range(n_wave_pts):
+            dot = Dot(radius=0.015, color=COLOR_LASER, fill_opacity=0.8)
+            wave_dots.add(dot)
+
+        def update_wave(mob):
+            t = vibrate.get_value()
+            offset = 0.15 * np.sin(10 * t)
+            for i, dot in enumerate(mob):
+                frac = i / (n_wave_pts - 1)
+                x = -0.11 + 0.22 * frac
+                base_y = offset - 0.4 * (1 - abs(x) / 0.12)
+                wave_y = 0.04 * np.sin(wave_omega * t - wave_k * x)
+                dot.move_to(np.array([x, base_y + wave_y, 0]))
+
+        wave_dots.add_updater(update_wave)
+
         cantilever.add_updater(update_cantilever)
-        
-        self.play(vibrate.animate.set_value(2 * PI), run_time=2, rate_func=linear)
+
+        # 同时：淡入激光、显示表面波、振动悬臂梁
+        self.play(
+            FadeIn(laser_in), FadeIn(laser_out),
+            FadeIn(wave_dots),
+            vibrate.animate.set_value(2 * PI),
+            run_time=2, rate_func=linear
+        )
         cantilever.remove_updater(update_cantilever)
-        
+        wave_dots.remove_updater(update_wave)
+
         # 3. 频移公式（3-4秒）
         freq_shift = MathTex(
             r"\Delta f \approx -\frac{f_0}{2k} \frac{dF}{dz}",
@@ -572,6 +605,7 @@ class Scene4_FrequencyShiftDetection(Scene):
         self.play(
             FadeOut(cantilever), FadeOut(laser_in), FadeOut(laser_out),
             FadeOut(detector), FadeOut(cross), FadeOut(detector_label),
+            FadeOut(wave_dots),
             run_time=0.5
         )
 
