@@ -25,22 +25,30 @@ SCENES = [
     ("Scene3_ExponentialPauliRepulsion", "镜头3_指数排斥势"),
     ("Scene4_FrequencyShiftDetection", "镜头4_频移检测原理"),
     ("Scene5_AFMForceCurve", "镜头5_力曲线工作模式"),
+    ("AFMSystemDiagram", "镜头6_AFM系统结构图"),
+    ("AFMSystemSimplified", "镜头7_AFM系统简化版"),
 ]
 
 def render_scene(class_name, output_name, quality="k"):
     """
     渲染单个场景
-    
+
     参数:
         class_name: 场景类名
         output_name: 输出文件名前缀
         quality: 渲染质量 (l=低, m=中, h=高, k=4K)
     """
+    # 根据场景类名选择对应的源文件
+    if "AFMSystem" in class_name:
+        source_file = "afm_system.py"
+    else:
+        source_file = "afm_scenes.py"
+
     cmd = [
         "manim",
         "-q", quality,
         "-o", output_name,
-        "afm_scenes.py",
+        source_file,
         class_name
     ]
     

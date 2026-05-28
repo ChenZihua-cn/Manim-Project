@@ -642,7 +642,6 @@ class Scene4_FrequencyShiftDetection(Scene):
         # ========== 5. 转场淡出 ==========
         self.play(
             FadeOut(surface), FadeOut(surface_fill), FadeOut(surface_label),
-            
             FadeOut(cantilever), FadeOut(detector), FadeOut(cross),
             FadeOut(detector_label),
             FadeOut(laser_in), FadeOut(laser_out), FadeOut(spot),
