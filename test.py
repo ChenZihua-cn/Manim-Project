@@ -8,6 +8,7 @@ class SimpleScene(ThreeDScene):
             font="Arial",
             font_size=72
         )
+        
 
         circle = Circle()  # Create a circle
         circle.set_fill(PINK, opacity=0.5)  # Set the fill color and opacity
@@ -46,7 +47,8 @@ class SimpleScene(ThreeDScene):
         self.play(FadeOut(cube))  # Uncreate the displayed square
 
         self.move_camera(theta=0*DEGREES, phi=-180*DEGREES)
-
+        
+        self.add_fixed_in_frame_mobjects(text)
         self.play(Write(text))  # Write the text on the screen
 
         self.wait(1)  # Wait for a second
