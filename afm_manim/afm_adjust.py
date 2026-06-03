@@ -43,6 +43,45 @@ class Scene1_afm_adjust(Scene):
 
 
 
+        # ---5. Laser ---
+        laser = Dot(color=RED, radius=0.08)
+        
+        # 添加路径轨迹
+        trace = TracedPath(laser.get_center, stroke_color=YELLOW, stroke_width=2)
+        
+        x = ValueTracker(5)   # 起始偏移
+        y = ValueTracker(3)
+        laser.add_updater(lambda d: d.move_to((x.get_value(), y.get_value(), 0)))
+        # Changed [...] to (...)
+        # a tuple satisfies tuple[float, float, float] in Manim's Point3DLike union type
+        self.add(laser, trace)
+                
+        # PID 控制风格的校准
+        for _ in range(80):
+            error_x = -x.get_value()
+            error_y = -y.get_value()
+            
+            # 抖动随误差减小而减小（越接近越稳定）
+            jitter = 0.3 * (abs(error_x) + abs(error_y)) / 10
+            
+            new_x = x.get_value() + error_x * 0.15 + np.random.uniform(-jitter, jitter)
+            new_y = y.get_value() + error_y * 0.15 + np.random.uniform(-jitter, jitter)
+            
+            self.play(
+                x.animate.set_value(new_x),
+                y.animate.set_value(new_y),
+                run_time=0.05,
+                rate_func=linear
+            )
+        
+        # 最终稳定在靶心
+        self.play(
+            x.animate.set_value(0),
+            y.animate.set_value(0),
+            run_time=0.5
+        )
+
+     
 
 
 
