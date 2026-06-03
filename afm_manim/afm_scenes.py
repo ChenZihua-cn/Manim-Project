@@ -522,6 +522,35 @@ class Scene4_FrequencyShiftDetection(Scene):
         )
         cantilever = VGroup(cantilever_base, tip_shape)
 
+        
+        # 激光路径（入射到悬臂梁反射点，反射点跟随振动）—— 初始隐藏
+        laser_in = Arrow((-3.5, 1.5, 0), (0, 0.15, 0), color=COLOR_LASER, buff=0)
+        laser_out = Arrow((0, 0.15, 0), (3, 1.8, 0), color=COLOR_LASER, buff=0)
+        laser_in.set_stroke(opacity=0)
+        laser_out.set_stroke(opacity=0)
+        
+        # 四象限探测器
+        detector = Rectangle(width=1.2, height=1.2, color=COLOR_DETECTOR, stroke_width=2)
+        detector.move_to((3, 1.8, 0))
+        
+        # 探测器分割线
+        cross = VGroup(
+            Line((3, 1.2, 0), (3, 2.4, 0), color=GREY),
+            Line((2.4, 1.8, 0), (3.6, 1.8, 0), color=GREY)
+        )
+        
+        # 探测器标签
+        detector_label = Text("四象限探测器", font_size=20, color=COLOR_DETECTOR)
+        detector_label.next_to(detector, UP, buff=0.2)
+        
+        self.add(cantilever, detector, cross, detector_label)
+
+        # 2. 初始静止展示（0-1秒）—— 激光箭头不显示
+        self.wait(1)
+
+        # 3. 悬臂梁振动 + 激光 + 探针尖端表面波（1-3秒）
+        vibrate = ValueTracker(0)
+
         def update_cantilever(mob):
             shift = surface_shift.get_value()
             tip_y = surface_profile(shift)
@@ -532,6 +561,28 @@ class Scene4_FrequencyShiftDetection(Scene):
                 color=GREY, fill_opacity=1
             )
             mob.become(VGroup(new_base, new_tip))
+
+
+        # 探针尖端不平整表面 —— 移动波 sin(ωt - kx)
+        n_wave_pts = 25
+        wave_k = 20
+        wave_omega = 8 * PI
+        wave_dots = VGroup()
+        for i in range(n_wave_pts):
+            dot = Dot(radius=0.015, color=COLOR_LASER, fill_opacity=0.8)
+            wave_dots.add(dot)
+
+        def update_wave(mob):
+            t = vibrate.get_value()
+            offset = 0.15 * np.sin(10 * t)
+            for i, dot in enumerate(mob):
+                frac = i / (n_wave_pts - 1)
+                x = -0.11 + 0.22 * frac
+                base_y = offset - 0.4 * (1 - abs(x) / 0.12)
+                wave_y = 0.04 * np.sin(wave_omega * t - wave_k * x)
+                dot.move_to(np.array([x, base_y + wave_y, 0]))
+
+        wave_dots.add_updater(update_wave)
 
         cantilever.add_updater(update_cantilever)
 
@@ -550,6 +601,36 @@ class Scene4_FrequencyShiftDetection(Scene):
         laser_in = Arrow((-3.5, 1.5, 0), (0, 0.1, 0),
                          color=COLOR_LASER, buff=0, stroke_width=2)
 
+
+        # 同时：淡入激光、显示表面波、振动悬臂梁
+        self.play(
+            FadeIn(laser_in), FadeIn(laser_out),
+            FadeIn(wave_dots),
+            vibrate.animate.set_value(2 * PI),
+            run_time=2, rate_func=linear
+        )
+        cantilever.remove_updater(update_cantilever)
+        wave_dots.remove_updater(update_wave)
+
+        # 3. 频移公式（3-4秒）
+        freq_shift = MathTex(
+            r"\Delta f \approx -\frac{f_0}{2k} \frac{dF}{dz}",
+            font_size=44, color=WHITE
+        ).to_edge(UP)
+        
+        self.play(Write(freq_shift), run_time=1)
+        
+        # 高亮 dF/dz - use index instead of get_part_by_tex
+        self.play(Indicate(freq_shift[0][6:9], color=RED, scale_factor=1.2), run_time=0.5)
+        
+        # 4. 光斑移动和信号显示（4-6秒）
+        spot = Dot(color=COLOR_EQUILIBRIUM, radius=0.1)
+        spot.move_to(detector.get_center())
+        
+        def update_spot(mob):
+            offset_x = 0.4 * np.sin(10 * vibrate.get_value())
+            mob.move_to(detector.get_center() + RIGHT * offset_x)
+        
         def update_laser_in(mob):
             shift = surface_shift.get_value()
             tip_y = surface_profile(shift)
@@ -647,6 +728,9 @@ class Scene4_FrequencyShiftDetection(Scene):
             FadeOut(laser_in), FadeOut(laser_out), FadeOut(spot),
             FadeOut(scan_label),
             FadeOut(topo_axes), FadeOut(topo_title), FadeOut(topo_trace),
+            FadeOut(cantilever), FadeOut(laser_in), FadeOut(laser_out),
+            FadeOut(detector), FadeOut(cross), FadeOut(detector_label),
+            FadeOut(wave_dots),
             run_time=0.5
         )
 

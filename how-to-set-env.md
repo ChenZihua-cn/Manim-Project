@@ -1,7 +1,7 @@
-# ManimGL 环境配置与使用手册
+# Manim 环境配置与使用手册
 
-> 本项目使用 **3b1b 原版 ManimGL v1.7.2**（即 `manimgl`），不是 Manim Community 版本。
-> 源码位于 `D:\30856\Manim\manim\`，虚拟环境位于 `D:\30856\Manim\.venv\`。
+> 本项目使用 **Manim Community Edition v0.20.1**（即 `manim`），不是 3b1b 原版 ManimGL。
+> 虚拟环境位于 `D:\30856\Manim\Project_1\.venv\`，由 uv 管理。
 
 ---
 
@@ -11,30 +11,30 @@
 
 ```bash
 # Git Bash / 终端
-cd D:/30856/Manim
+cd D:/30856/Manim/Project_1
 source .venv/Scripts/activate
 
 # PowerShell
-cd D:\30856\Manim
+cd D:\30856\Manim\Project_1
 .venv\Scripts\Activate.ps1
 
 # CMD
-cd D:\30856\Manim
+cd D:\30856\Manim\Project_1
 .venv\Scripts\activate.bat
 ```
 
 验证环境是否正常：
 
 ```bash
-manimgl --version
-# 应输出：ManimGL v1.7.2
+manim --version
+# 应输出：Manim Community v0.20.1
 ```
 
 ---
 
 ## 二、依赖说明
 
-manimgl 的依赖分为两类：
+manim 的依赖分为两类：
 
 ### Python 包（`pip install -e .` 自动处理，无需手动安装）
 
@@ -127,7 +127,7 @@ cd ..
 
 ```bash
 python -c "import manimlib; print('OK')"
-manimgl --version
+manim --version
 ```
 
 ---
@@ -170,7 +170,7 @@ rm -rf .venv
 source .venv/Scripts/activate
 ```
 
-### 步骤 5：安装 manimgl（从本地源码，开发模式）
+### 步骤 5：安装 manim（从本地源码，开发模式）
 
 ```bash
 cd manim
@@ -184,7 +184,7 @@ cd ..
 
 ```bash
 python -c "import manimlib; print('OK')"
-manimgl --version
+manim --version
 ```
 
 两条命令均正常输出即表示环境配置成功。
@@ -192,7 +192,7 @@ manimgl --version
 ### 步骤 7：测试运行示例场景
 
 ```bash
-manimgl manim/example_scenes.py OpeningManimExample
+manim manim/example_scenes.py OpeningManimExample
 ```
 
 ---
@@ -202,14 +202,14 @@ manimgl manim/example_scenes.py OpeningManimExample
 ### 基本语法
 
 ```
-manimgl <文件路径> <场景类名> [选项]
+manim <文件路径> <场景类名> [选项]
 ```
 
 ### 预览模式（最常用，实时窗口）
 
 ```bash
 # 打开交互窗口预览场景
-manimgl my_scene.py MyScene
+manim my_scene.py MyScene
 ```
 
 窗口快捷键：
@@ -221,78 +221,78 @@ manimgl my_scene.py MyScene
 
 ```bash
 # 导出为视频文件（保存到 videos/ 目录）
-manimgl my_scene.py MyScene -w
+manim my_scene.py MyScene -w
 
 # 导出并自动打开
-manimgl my_scene.py MyScene -w -o
+manim my_scene.py MyScene -w -o
 
 # 导出为 GIF
-manimgl my_scene.py MyScene -w -i
+manim my_scene.py MyScene -w -i
 ```
 
 ### 分辨率控制
 
 ```bash
-manimgl my_scene.py MyScene -w -l        # 480p（低画质，速度快）
-manimgl my_scene.py MyScene -w -m        # 720p（中等画质）
-manimgl my_scene.py MyScene -w --hd      # 1080p
-manimgl my_scene.py MyScene -w --uhd     # 4K
+manim my_scene.py MyScene -w -l        # 480p（低画质，速度快）
+manim my_scene.py MyScene -w -m        # 720p（中等画质）
+manim my_scene.py MyScene -w --hd      # 1080p
+manim my_scene.py MyScene -w --uhd     # 4K
 
 # 自定义分辨率
-manimgl my_scene.py MyScene -w -r 1280x720
+manim my_scene.py MyScene -w -r 1280x720
 ```
 
 ### 只保存最后一帧（截图）
 
 ```bash
-manimgl my_scene.py MyScene -s
+manim my_scene.py MyScene -s
 ```
 
 ### 从指定动画编号开始渲染
 
 ```bash
 # 从第 3 个动画开始
-manimgl my_scene.py MyScene -n 3
+manim my_scene.py MyScene -n 3
 
 # 只渲染第 3 到第 6 个动画
-manimgl my_scene.py MyScene -n 3,6
+manim my_scene.py MyScene -n 3,6
 ```
 
 ### 设置背景颜色
 
 ```bash
-manimgl my_scene.py MyScene -c BLACK
-manimgl my_scene.py MyScene -c "#1a1a2e"
+manim my_scene.py MyScene -c BLACK
+manim my_scene.py MyScene -c "#1a1a2e"
 ```
 
 ### 自定义帧率
 
 ```bash
-manimgl my_scene.py MyScene -w --fps 60
+manim my_scene.py MyScene -w --fps 60
 ```
 
 ### 演示模式（PPT 风格，按空格翻页）
 
 ```bash
-manimgl my_scene.py MyScene -p
+manim my_scene.py MyScene -p
 ```
 
 ### 交互式调试（在指定行插入 iPython 断点）
 
 ```bash
-manimgl my_scene.py MyScene -e 42    # 在第 42 行暂停进入 iPython
+manim my_scene.py MyScene -e 42    # 在第 42 行暂停进入 iPython
 ```
 
 ### 渲染文件内所有场景
 
 ```bash
-manimgl my_scene.py -a -w
+manim my_scene.py -a -w
 ```
 
 ### 清除 Tex/Text 缓存
 
 ```bash
-manimgl --clear-cache
+manim --clear-cache
 ```
 
 ---
@@ -302,7 +302,7 @@ manimgl --clear-cache
 ```
 D:\30856\Manim\
 ├── .venv\              # 虚拟环境（不要手动修改）
-├── manim\              # manimgl 源码（从 GitHub 克隆）
+├── manim\              # manim 源码（从 GitHub 克隆）
 │   ├── manimlib\       # 核心库代码
 │   ├── example_scenes.py
 │   └── requirements.txt
@@ -316,14 +316,14 @@ D:\30856\Manim\
 
 ### `ModuleNotFoundError: No module named 'manimlib'`
 
-原因：manimgl 没有安装到当前虚拟环境，或虚拟环境没有激活。
+原因：manim 没有安装到当前虚拟环境，或虚拟环境没有激活。
 
 ```bash
 source .venv/Scripts/activate
 cd manim && pip install -e . && cd ..
 ```
 
-### `manimgl: command not found`
+### `manim: command not found`
 
 原因：虚拟环境未激活。执行 `source .venv/Scripts/activate` 后重试。
 
