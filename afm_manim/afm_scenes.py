@@ -624,13 +624,6 @@ class Scene4_FrequencyShiftDetection(Scene):
         self.play(Indicate(freq_shift[0][6:9], color=RED, scale_factor=1.2), run_time=0.5)
         
         # 4. 光斑移动和信号显示（4-6秒）
-        spot = Dot(color=COLOR_EQUILIBRIUM, radius=0.1)
-        spot.move_to(detector.get_center())
-        
-        def update_spot(mob):
-            offset_x = 0.4 * np.sin(10 * vibrate.get_value())
-            mob.move_to(detector.get_center() + RIGHT * offset_x)
-        
         def update_laser_in(mob):
             shift = surface_shift.get_value()
             tip_y = surface_profile(shift)
