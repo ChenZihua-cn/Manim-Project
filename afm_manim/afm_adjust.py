@@ -111,14 +111,65 @@ class Scene1_afm_adjust(Scene):
             run_time=0.5
         )
 
-     
+        # --- Animation sequence ---
+
+        self.play(FadeIn(tipHolder), Write(framebox_tipHolder), run_time=1)
+        self.play(FadeIn(chip), Write(framebox_chip), run_time=1)
+        self.play(FadeIn(cantilever), Write(framebox_cantilever), run_time=1)
+        self.play(GrowFromCenter(chip_annotation), Write(label_0), run_time=1)
+
+
+        self.wait(0.5)
+
+
+        self.play(FadeOut(tipHolder), FadeOut(framebox_tipHolder),
+                  FadeOut(chip), FadeOut(framebox_chip),
+                  FadeOut(cantilever), FadeOut(framebox_cantilever),
+                  FadeOut(chip_annotation), FadeOut(label_0),
+                  fadeOut()
+                  )
+        
+
 
 
 
 #
 #
 class Scene2_afm_adjust(Scene):
-    pass
+    # ---1. Block Geometry ---
+
+    top_left = np.array([-3, 1.5, 0])
+    top_right = np.array([3, 1.5, 0])
+    bot_left = np.array([-3.5, -0.8, 0])
+    bot_right = np.array([3.5, -0.8, 0])
+    
+    block = Polygon(
+            top_left, top_right, bot_left, bot_right,
+            color=GRAY, fill_opacity=0.8, stroke_width=1
+            )
+
+    cantilever = Line().next_to(block, DOWN, buff=0)
+
+    tip = TriAngle().next_to(cantilever, DOWN+LEFT, buff=0)
+
+    leftView = Vgroup(block, cantilver, tip)
+
+    # ---2. Label ---
+
+    framebox_block = SurroundingRectangle()
+
+    label_block = Text()
+    
+
+    # ---3. Laser Beam A (Top surface horizontal) ---
+
+
+
+    # ---4. Laser Beam B (Lefr surface linear) ---
+
+
+
+
 
 #
 #
