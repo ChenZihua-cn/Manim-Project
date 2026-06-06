@@ -16,118 +16,175 @@ config.background_color = BLACK
 config.pixel_width = 1920
 config.pixel_height = 1080
 
-# Color definitions
 
-
-# 
 #
 class Scene1_afm_adjust(Scene):
-    # The constructure of the TipHolder, Chip, Cantilever
     def construct(self):
         holder_w, holder_h = 9.56, 1.89
         chip_w, chip_h = 4.44, 0.99
         cantilever_edge = 2.00
 
-        # ---1. TipHolder ---
-        tipHolder = Rectangle(width=holder_w, height=holder_h)
-        tipHolder.next_to(chip, direction=UP, aligned_edge=DOWN)
-        
-        framebox_tipHolder = SurroundingRectangle()
-
-        # ---2. Chip ---
-        chip = Rectangle(width=chip_w, height=chip_h)
+        # ---1. Chip (created first so others can reference it) ---
+        chip = Rectangle(width=chip_w, height=chip_h, color=GREY,
+                        fill_opacity=0.6, stroke_width=1)
         chip.move_to(ORIGIN)
+        chip_label = Text("玻璃基片 (Chip)", font_size=22, color=WHITE)
+        chip_label.next_to(chip, LEFT, buff=0.6)
 
-        framebox_chip = SurroundingRectangle()
+        framebox_chip = SurroundingRectangle(chip, color=BLUE, buff=0.1)
 
-        # ---3. Cantilever ---
-        cantilever_base = Triangle(color=WHITE).rotate(PI)
-        cantilever_covered = Triangle(color=BLACK).rotate(PI)
+        # ---2. TipHolder (above chip) ---
+        tipHolder = Rectangle(width=holder_w, height=holder_h, color=GREY,
+                             fill_opacity=0.7, stroke_width=1)
+        tipHolder.next_to(chip, direction=UP, buff=0.015)
 
+        holder_label = Text("探针架 (Tip Holder)", font_size=22, color=WHITE)
+        holder_label.next_to(tipHolder, UP, buff=0.025)
+
+        framebox_tipHolder = SurroundingRectangle(tipHolder, color=BLUE, buff=0.1)
+
+        # ---3. Cantilever (V-shape below chip) ---
+        # Default triangle side = sqrt(3) * radius = sqrt(3) ≈ 1.732
+        # Scale to match cantilever_edge
+        tri_scale = cantilever_edge / np.sqrt(3)
+        cantilever_base = Triangle(color=WHITE).rotate(PI).scale(tri_scale)
+        cantilever_covered = Triangle(color=BLACK).rotate(PI).scale(tri_scale*0.5)
         cantilever = VGroup(cantilever_base, cantilever_covered)
+        cantilever.next_to(chip, direction=DOWN, buff=0.01)
 
-        cantilever.next_to(chip, direction=DOWN, aligned_edge=UP)
-        
-        framebox_cantilever = SurroundingRectangle()
-        
-        """ 1.2.3. is a Vgroup() , maybe would be use in the future """
-        # ---4. Annotation ---
-        arrow_top_y = tipHolder.get_bottom()[1]
+        c_label = Text("三角悬臂 (Cantilever)", font_size=22, color=WHITE)
+        c_label.next_to(cantilever, DOWN, buff=0.2)
+
+        framebox_cantilever = SurroundingRectangle(cantilever, color=BLUE, buff=0.15)
+
+        # ---4. Dimension annotation (chip length: 1-2 mm) ---
+        arrow_top_y = chip.get_top()[1]
         arrow_bot_y = chip.get_bottom()[1]
-        arrow_x = chip.get_right() + 1.0
-        
+        arrow_x = chip.get_right()[0] + 1.0
+
         arrow_0 = DoubleArrow(
-                start=[arrow_x, arrow_top_y, 0],
-                end=[arrow_x, arrow_bot_y, 0],
-                color=WHITE, stroke_width=3,
-                tip_shape=StealthTip, tip_length=0.15, buff=0
-                )
-        up_line = Line(chip.get_corner(UP+RIGHT), arrow_0.get_top())
-        bot_line = Line(chip.get_corner(DOWN+RIGHT), arrow_0.get_bottom())
+            start=[arrow_x, arrow_top_y, 0],
+            end=[arrow_x, arrow_bot_y, 0],
+            color=WHITE, stroke_width=3,
+            tip_length=0.15, buff=0
+        )
+        up_line = Line(chip.get_corner(UP + RIGHT), [arrow_x, arrow_top_y, 0])
+        bot_line = Line(chip.get_corner(DOWN + RIGHT), [arrow_x, arrow_bot_y, 0])
 
         chip_annotation = VGroup(arrow_0, up_line, bot_line)
 
+        dim_label = MathTex(r"1{-}2\,\text{mm}", font_size=28, color=WHITE)
+        dim_label.next_to(chip_annotation, RIGHT, buff=0.2)
 
-        label_0 = MathTex(r"1{-}2\,\text{mm}", font_size=28, color=WHITE)
-        label_0.next_to(chip_annotation, RIGHT, buff=0.2)
-
-
-
-        # ---5. Laser ---
+        # ---5. Laser dot with traced path ---
         laser = Dot(color=RED, radius=0.08)
-        
-        # 添加路径轨迹
+        laser_glow = Dot(color=RED, radius=0.14, fill_opacity=0.3)
+        laser_group = VGroup(laser_glow, laser)
+
         trace = TracedPath(laser.get_center, stroke_color=YELLOW, stroke_width=2)
-        
-        x = ValueTracker(5)   # 起始偏移
+
+        x = ValueTracker(5)
         y = ValueTracker(3)
         laser.add_updater(lambda d: d.move_to((x.get_value(), y.get_value(), 0)))
-        # Changed [...] to (...)
-        # a tuple satisfies tuple[float, float, float] in Manim's Point3DLike union type
-        self.add(laser, trace)
-                
-        # PID 控制风格的校准
-        for _ in range(80):
-            error_x = -x.get_value()
-            error_y = -y.get_value()
-            
-            # 抖动随误差减小而减小（越接近越稳定）
-            jitter = 0.3 * (abs(error_x) + abs(error_y)) / 10
-            
-            new_x = x.get_value() + error_x * 0.15 + np.random.uniform(-jitter, jitter)
-            new_y = y.get_value() + error_y * 0.15 + np.random.uniform(-jitter, jitter)
-            
+        laser_glow.add_updater(lambda g: g.move_to(laser.get_center()))
+
+        # ============================================================
+        # Animation sequence
+        # ============================================================
+
+        # Phase 1: Show entire structure at once (no frameboxes yet)
+        all_geo = VGroup(tipHolder, chip, cantilever)
+        self.play(FadeIn(all_geo), run_time=1.2)
+        self.wait(0.4)
+
+        # Phase 2: Voiceover-style — highlight each part one by one
+        # --- TipHolder ---
+        self.play(Create(framebox_tipHolder), Write(holder_label), run_time=1.2)
+        self.wait(0.6)
+        self.play(FadeOut(framebox_tipHolder), run_time=0.4)
+
+        # --- Chip ---
+        self.play(Create(framebox_chip), Write(chip_label), run_time=1.2)
+        self.wait(0.6)
+        self.play(FadeOut(framebox_chip), run_time=0.4)
+
+        # --- Cantilever ---
+        self.play(Create(framebox_cantilever), Write(c_label), run_time=1.2)
+        self.wait(0.6)
+        self.play(FadeOut(framebox_cantilever), run_time=0.4)
+
+        # Phase 3: Dimension annotation
+        self.play(GrowFromCenter(chip_annotation), Write(dim_label), run_time=1.2)
+        self.wait(0.5)
+
+        # Phase 4: Laser appears in black area (outside structure)
+        note_1 = Text("激光光点出现在视野中", font_size=26, color=YELLOW)
+        note_1.to_edge(DOWN, buff=0.5)
+
+        # Start from black area — upper-right of the structure
+        x.set_value(5)
+        y.set_value(3)
+        self.play(FadeIn(laser_group, scale=0.5), Write(note_1), run_time=1.0)
+        self.wait(0.6)
+        self.play(FadeOut(note_1), run_time=0.5)
+
+        # Phase 5: PID-style laser adjustment toward chip area
+        self.add(trace)
+
+        adjust_note = Text("调节旋钮 → 激光向基片移动", font_size=24, color=WHITE)
+        adjust_note.to_edge(DOWN, buff=0.5)
+        self.play(Write(adjust_note), run_time=1.0)
+
+        target = chip.get_center()
+
+        for _ in range(50):
+            error_x = target[0] - x.get_value()
+            error_y = target[1] - y.get_value()
+
+            jitter = 0.25 * (abs(error_x) + abs(error_y)) / 8
+
+            new_x = x.get_value() + error_x * 0.12 + np.random.uniform(-jitter, jitter)
+            new_y = y.get_value() + error_y * 0.12 + np.random.uniform(-jitter, jitter)
+
             self.play(
                 x.animate.set_value(new_x),
                 y.animate.set_value(new_y),
-                run_time=0.05,
+                run_time=0.1,
                 rate_func=linear
             )
-        
-        # 最终稳定在靶心
+
+        # Final snap to chip center
         self.play(
-            x.animate.set_value(0),
-            y.animate.set_value(0),
-            run_time=0.5
+            x.animate.set_value(target[0]),
+            y.animate.set_value(target[1]),
+            run_time=0.4
         )
+        self.remove(trace)
 
-        # --- Animation sequence ---
+        self.play(FadeOut(adjust_note), run_time=0.4)
 
-        self.play(FadeIn(tipHolder), Write(framebox_tipHolder), run_time=1)
-        self.play(FadeIn(chip), Write(framebox_chip), run_time=1)
-        self.play(FadeIn(cantilever), Write(framebox_cantilever), run_time=1)
-        self.play(GrowFromCenter(chip_annotation), Write(label_0), run_time=1)
+        # Phase 6: Laser lands on chip — bright spot visible from front
+        success_note = Text("正面观察可见明亮激光光点", font_size=26, color=GREEN)
+        success_note.to_edge(DOWN, buff=0.5)
+        self.play(Write(success_note), run_time=1.0)
+        self.wait(0.8)
+        self.play(FadeOut(success_note), run_time=0.4)
 
+        # Blocked note — laser on opaque holder, no transmission below
+        block_note = Text("激光完全被遮挡，下方无透射光斑", font_size=26, color=RED)
+        block_note.to_edge(DOWN, buff=0.5)
+        self.play(Write(block_note), run_time=1.2)
+        self.wait(1.2)
 
-        self.wait(0.5)
-
-
-        self.play(FadeOut(tipHolder), FadeOut(framebox_tipHolder),
-                  FadeOut(chip), FadeOut(framebox_chip),
-                  FadeOut(cantilever), FadeOut(framebox_cantilever),
-                  FadeOut(chip_annotation), FadeOut(label_0),
-                  fadeOut()
-                  )
+        # Phase 7: Fade out everything
+        self.play(
+            FadeOut(tipHolder), FadeOut(holder_label),
+            FadeOut(chip), FadeOut(chip_label),
+            FadeOut(cantilever), FadeOut(c_label),
+            FadeOut(chip_annotation), FadeOut(dim_label),
+            FadeOut(laser_group), FadeOut(success_note),
+            run_time=0.8
+        )
         
 
 
@@ -150,15 +207,15 @@ class Scene2_afm_adjust(Scene):
 
     cantilever = Line().next_to(block, DOWN, buff=0)
 
-    tip = TriAngle().next_to(cantilever, DOWN+LEFT, buff=0)
+    tip = Triangle().next_to(cantilever, DOWN + LEFT, buff=0)
 
-    leftView = Vgroup(block, cantilver, tip)
+    leftView = VGroup(block, cantilever, tip)
 
     # ---2. Label ---
 
-    framebox_block = SurroundingRectangle()
+    framebox_block = SurroundingRectangle(block)
 
-    label_block = Text()
+    label_block = Text("探针基片")
     
 
     # ---3. Laser Beam A (Top surface horizontal) ---
