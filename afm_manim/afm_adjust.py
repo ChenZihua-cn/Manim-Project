@@ -48,7 +48,7 @@ class Scene1_afm_adjust(Scene):
         # Scale to match cantilever_edge
         tri_scale = cantilever_edge / np.sqrt(3)
         cantilever_base = Triangle(color=WHITE).rotate(PI).scale(tri_scale)
-        cantilever_covered = Triangle(color=BLACK).rotate(PI).scale(tri_scale*0.5)
+        cantilever_covered = Triangle(color=BLACK).rotate(PI).scale(tri_scale*0.3)
         cantilever = VGroup(cantilever_base, cantilever_covered)
         cantilever.next_to(chip, direction=DOWN, buff=0.01)
 
@@ -159,7 +159,7 @@ class Scene1_afm_adjust(Scene):
             y.animate.set_value(target[1]),
             run_time=0.4
         )
-        self.remove(trace)
+        self.play(FadeOut(trace))
 
         self.play(FadeOut(adjust_note), run_time=0.4)
 
@@ -183,11 +183,9 @@ class Scene1_afm_adjust(Scene):
             FadeOut(cantilever), FadeOut(c_label),
             FadeOut(chip_annotation), FadeOut(dim_label),
             FadeOut(laser_group), FadeOut(success_note),
+            FadeOut(block_note),
             run_time=0.8
         )
-        
-
-
 
 
 #
