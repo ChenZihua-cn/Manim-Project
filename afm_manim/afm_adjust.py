@@ -17,10 +17,34 @@ config.pixel_width = 1920
 config.pixel_height = 1080
 
 # Color definitions
+COLOR_LASER = "#FF0000"
+COLOR_LASER_SPOT = "#FF4444"
+COLOR_TIP_HOLDER = "#555555"
+COLOR_CHIP = "#999999"
+COLOR_CANTILEVER = "#666666"
+COLOR_BLOCK = "#888888"
+COLOR_PROBE_TIP = "#222222"
+COLOR_PAPER = "#EEEEEE"
+COLOR_DIFFRACTION = "#FFC107"
+COLOR_ROUND_SPOT = "#FF4444"
+COLOR_GREEN = "#43A047"
 
+"""
+这是一张关于原子力显微镜探针的结构示意图
 
-# 
-#
+图片包含以下主要元素和标注，从上到下依次为：
+
+1. **探针架 (TipHolder)**：最上方的深灰色矩形块，用于固定装置。
+2. **玻璃体 (Chip)**：中间较浅灰色的矩形块，位于探针架下方。
+3. **三角悬臂 (Cantilever)**：最下方一个向下突出的"V"字型结构，通常带有微小的探针尖端。
+4. **尺寸标注**：右侧有一个双向箭头，标明了玻璃体底端到悬臂最底端之间的距离为 **1-2mm**。
+
+图片整体采用黑、白、灰三种颜色，用简单的几何图形和文字表示器件的层级关系及尺寸结构。
+"""
+
+# 这里是先将激光光点调节至探针架区域，一开始不在这三个元素的任何一个上
+# 顺时针旋转激光器位置垂直调节旋钮，直到激光落到探针架或探针基片上。
+# 用random和updater模拟光路调节的微扰
 class Scene1_afm_adjust(Scene):
     # The constructure of the TipHolder, Chip, Cantilever
     def construct(self):
@@ -71,8 +95,6 @@ class Scene1_afm_adjust(Scene):
         label_0 = MathTex(r"1{-}2\,\text{mm}", font_size=28, color=WHITE)
         label_0.next_to(chip_annotation, RIGHT, buff=0.2)
 
-
-
         # ---5. Laser ---
         laser = Dot(color=RED, radius=0.08)
         
@@ -110,10 +132,6 @@ class Scene1_afm_adjust(Scene):
             y.animate.set_value(0),
             run_time=0.5
         )
-
-     
-
-
 
 #
 #
