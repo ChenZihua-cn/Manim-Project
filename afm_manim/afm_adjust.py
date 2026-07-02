@@ -1,7 +1,7 @@
 """
-Here is the left part (Position) of a 16:9 video 
+Here is the left part (Position) of a 16:9 video
 
-It shows how to adjust the afm 
+It shows how to adjust the afm
 
 """
 
@@ -209,52 +209,158 @@ class Scene1_afm_adjust(Scene):
             FadeOut(chip), FadeOut(chip_label),
             FadeOut(cantilever), FadeOut(c_label),
             FadeOut(chip_annotation), FadeOut(dim_label),
-            FadeOut(laser_group), FadeOut(success_note),
+            FadeOut(laser_group),
             FadeOut(block_note),
             run_time=0.8
         )
+        self.wait(0.2)
 
 
-#
-#
+"""
+### 1. 核心物理主体 (反射物体)
+这是一个侧视图
+*   **外观**：图片中央有一个灰色的、具有厚度的块状物体（类似于一个梯形柱体或带斜面的底座）。
+*   **结构**：
+    *   顶部是一个水平的平坦面。
+    *   左侧是一个倾斜的表面（斜面）。
+    *   底部有一个指向下方的黑色小三角形（探针）。
+
+### 2. 右侧光路 (光束 A)
+*   **入射**：一束红色的激光（标有"Laser"）从右上方向左下方照射。
+*   **接触点**：光束触及灰色物体的**顶部水平面**。
+*   **反射**：根据反射定律（入射角等于反射角），光束向上方反射。
+*   **终点**：反射光线指向标有字母 **A** 的位置。
+
+### 3. 左侧光路 (光束 B)
+*   **入射**：另一束红色的激光（标有"Laser"）从右上方偏右向左下方照射。
+*   **接触点**：光束触及灰色物体的**左侧倾斜面**。
+*   **反射**：同样遵循反射定律，光束在此斜面上产生反射。
+*   **终点**：反射光线向左下方射出，指向标有字母 **B** 的位置。
+
+"""
+# 调节水平旋钮，使激光光点落在探针基片的中间位置；
+# 调节垂直旋钮，使激光往悬臂方向移动。由于探针基片的边缘是一个梯形，有一定的倾斜度，
+# 所以，激光落在探针基片的边缘时，反射的激光光点会落在探头的前方，
+# 此时，稍微调节垂直旋钮，即可将激光调节到悬臂的区域附近。
 class Scene2_afm_adjust(Scene):
-    # ---1. Block Geometry ---
+    def construct(self):
+        # ---1. Block Geometry ---
 
-    top_left = np.array([-3, 1.5, 0])
-    top_right = np.array([3, 1.5, 0])
-    bot_left = np.array([-3.5, -0.8, 0])
-    bot_right = np.array([3.5, -0.8, 0])
-    
-    block = Polygon(
-            top_left, top_right, bot_left, bot_right,
-            color=GRAY, fill_opacity=0.8, stroke_width=1
-            )
+        top_left = np.array([-2, 1.5, 0])
+        top_right = np.array([2, 1.5, 0])
+        bot_left = np.array([-4, -0.8, 0])
+        bot_right = np.array([2, -0.8, 0])
 
-    cantilever = Line().next_to(block, DOWN, buff=0)
+        block = Polygon(
+                top_left, top_right, bot_right, bot_left,
+                color=GRAY, fill_opacity=0.8, stroke_width=1
+                )
 
-    tip = Triangle().next_to(cantilever, DOWN + LEFT, buff=0)
+        cantilever = Line(start=bot_right, end=bot_left+LEFT, color=WHITE)
 
-    leftView = VGroup(block, cantilever, tip)
+        probe_tip = Triangle().scale(0.3).rotate(PI).next_to(
+            cantilever, DOWN + LEFT, buff=0).shift(0.5*RIGHT)
 
-    # ---2. Label ---
+        leftView = VGroup(block, cantilever, probe_tip)
 
-    framebox_block = SurroundingRectangle(block)
+        # ---2. Label ---
 
-    label_block = Text("探针基片")
-    
+        framebox_block = SurroundingRectangle(block)
 
-    # ---3. Laser Beam A (Top surface horizontal) ---
+        block_label = Text("探针基片 (侧视图)", font_size=24, color=WHITE)
+        block_label.next_to(block, UP, buff=0.4)
+
+        top_surface_label = Text("顶部水平面", font_size=20, color=WHITE)
+        top_surface_label.next_to(block.get_top(), UP, buff=0.15).shift(LEFT * 0.3)
+
+        tip_label = Text("探针", font_size=18, color=WHITE)
+        tip_label.next_to(probe_tip, DOWN, buff=0.15)
+
+        # ---3. Laser Beam A (Top surface horizontal) ---
+        inc_A_start = np.array([4.5, 3.2, 0])
+        inc_A_hit = (top_left + top_right) / 2   # (0, 1.5, 0)
+
+        inc_A_vec = inc_A_hit - inc_A_start
+        inc_A_dir = inc_A_vec / np.linalg.norm(inc_A_vec)
+
+        normal_top = np.array([0.0, 1.0, 0.0])
+        ref_A_dir = inc_A_dir - 2 * np.dot(inc_A_dir, normal_top) * normal_top
+        ref_A_end = inc_A_hit + ref_A_dir * 2.8
+
+        laser_A_in = Arrow(inc_A_start, inc_A_hit, color=COLOR_LASER,
+                           buff=0, stroke_width=2.5, tip_length=0.12)
+        laser_A_out = Arrow(inc_A_hit, ref_A_end, color=COLOR_LASER,
+                            buff=0, stroke_width=2.5, tip_length=0.12)
+
+        label_A = MathTex(r"A", font_size=36, color=RED)
+        label_A.move_to(ref_A_end + ref_A_dir * 0.3)
+
+        # ---4. Laser Beam B (Left sloped surface) ---
+        surf_B_vec = top_left - bot_left
+        surf_B_dir = surf_B_vec / np.linalg.norm(surf_B_vec)
+        normal_left = np.array([-surf_B_dir[1], surf_B_dir[0], 0])
+
+        inc_B_hit = (top_left + bot_left) / 2    # (-3.25, 0.35, 0)
+        inc_B_start = np.array([-3.5, 2.0, 0])
+
+        inc_B_vec = inc_B_hit - inc_B_start
+        inc_B_dir = inc_B_vec / np.linalg.norm(inc_B_vec)
+
+        ref_B_dir = inc_B_dir - 2 * np.dot(inc_B_dir, normal_left) * normal_left
+        ref_B_end = inc_B_hit + ref_B_dir * 2.2
+
+        laser_B_in = Arrow(inc_B_start, inc_B_hit, color=COLOR_LASER,
+                           buff=0, stroke_width=2.5, tip_length=0.12)
+        laser_B_out = Arrow(inc_B_hit, ref_B_end, color=COLOR_LASER,
+                            buff=0, stroke_width=2.5, tip_length=0.12)
+
+        label_B = MathTex(r"B", font_size=36, color=RED)
+        label_B.move_to(ref_B_end + ref_B_dir * 0.3)
+
+        # --- Narration text (right side) ---
+        narration_1 = Text(
+            "调节水平旋钮\n→ 激光移至基片中间",
+            font_size=22, color=WHITE, line_spacing=1.5
+        )
+        narration_1.to_edge(RIGHT, buff=0.6).shift(UP * 1.5)
+
+        narration_2 = Text(
+            "调节垂直旋钮\n→ 激光向悬臂移动",
+            font_size=22, color=WHITE, line_spacing=1.5
+        )
+        narration_2.to_edge(RIGHT, buff=0.6).shift(UP * 1.5)
+
+        narration_3 = Text(
+            "斜面边缘反射\n→ 光点落在探头前方",
+            font_size=22, color=WHITE, line_spacing=1.5
+        )
+        narration_3.to_edge(RIGHT, buff=0.6).shift(UP * 1.5)
+
+        # --- Animation ---
+        self.play(FadeIn(leftView), run_time=1.0)
+        self.play(Write(block_label), run_time=0.8)
+        self.play(Write(top_surface_label), run_time=0.8)
+        self.play(Write(tip_label), run_time=0.8)
+        self.wait(0.3)
+        self.play(FadeOut(block_label, top_surface_label, tip_label), run_time=0.8)
+
+        self.play(GrowArrow(laser_A_in), GrowArrow(laser_A_out),
+                  Write(label_A), Write(narration_1), run_time=1.2)
+        self.wait(0.5)
+        self.play(FadeOut(narration_1), run_time=0.5)
+
+        self.play(Write(narration_2), run_time=0.5)
+        self.wait(0.5)
+        self.play(FadeOut(narration_2), run_time=0.5)
+
+        self.play(Write(narration_3),
+                  GrowArrow(laser_B_in), GrowArrow(laser_B_out),
+                  Write(label_B), run_time=1.2)
+        self.wait(0.5)
+       
+        self.play(FadeOut(narration_3), run_time=0.5)
+        self.wait(1.5)
 
 
-
-    # ---4. Laser Beam B (Lefr surface linear) ---
-
-
-
-
-
-#
-#
 class Scene3_afm_adjust(Scene):
     pass
-
