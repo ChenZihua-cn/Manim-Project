@@ -265,97 +265,91 @@ class AFMSystemDiagram(Scene):
                            stroke_width=2, tip_length=0.15)
 
     def _create_feedback_dashed(self, scanner, probe):
-        """扫描器 → 样品 → 探针 的虚线物理反馈"""
+        """扫描器 → 探针 的虚线物理反馈"""
         sc_left = scanner.get_left() + LEFT * 0.2
-        sample_center = probe[0].get_center()  # surface
+        probe_tip = probe[3].get_center()
 
-        path = VMobject()
-        path.set_points_as_corners([
+        return DashedLine(
             sc_left + DOWN * 0.3,
-            sc_left + DOWN * 1.5,
-            sample_center + LEFT * 1.2,
-            sample_center + UP * 0.15,
-        ])
-        return DashedVMobject(path, num_dashes=18, color=COLOR_SCANNER, stroke_width=2)
+            probe_tip,
+            dash_length=0.15,
+            color=COLOR_SCANNER,
+            stroke_width=2,
+        )
 
     # ========== 信号流动画 ==========
 
     def _animate_full_signal_flow(self, probe, amp_det, comp, fb, scan_ctrl, gap_ctrl, scanner):
         """展示完整信号流，跟随曲线路径"""
-        dot = Dot(color=COLOR_SIGNAL, radius=0.08)
+        # 各阶段信号灯动画已注释
+        _ = (amp_det, comp, fb, scan_ctrl, gap_ctrl)
 
         # 阶段1: 探针 → 振幅检测 → 比较器
-        path1 = VMobject()
-        path1.set_points_as_corners([
-            probe.get_right() + RIGHT * 0.1,
-            amp_det.get_left() + LEFT * 0.1,
-            amp_det.get_right(),
-            comp.get_left(),
-        ])
-        self.play(MoveAlongPath(dot, path1), run_time=2, rate_func=linear)
-        self.play(FadeOut(dot), run_time=0.15)
+        # dot = Dot(color=COLOR_SIGNAL, radius=0.08)
+        # path1 = VMobject()
+        # path1.set_points_as_corners([
+        #     probe.get_right() + RIGHT * 0.1,
+        #     amp_det.get_left() + LEFT * 0.1,
+        #     amp_det.get_right(),
+        #     comp.get_left(),
+        # ])
+        # self.play(MoveAlongPath(dot, path1), run_time=2, rate_func=linear)
+        # self.play(FadeOut(dot), run_time=0.15)
 
         # 阶段2: 比较器 → 反馈控制器 (误差信号)
-        dot2 = Dot(color=COLOR_ERROR, radius=0.08)
-        path2 = VMobject()
-        path2.set_points_as_corners([
-            comp.get_right(),
-            fb.get_left() + UP * 0.2,
-        ])
-        self.play(MoveAlongPath(dot2, path2), run_time=1.5, rate_func=linear)
+        # dot2 = Dot(color=COLOR_ERROR, radius=0.08)
+        # path2 = VMobject()
+        # path2.set_points_as_corners([
+        #     comp.get_right(),
+        #     fb.get_left() + UP * 0.2,
+        # ])
+        # self.play(MoveAlongPath(dot2, path2), run_time=1.5, rate_func=linear)
 
         # 阶段3: 反馈控制器 分支 → 扫描控制 + 间距控制 (沿曲线)
-        dot3a = Dot(color=COLOR_FEEDBACK, radius=0.08)
-        dot3b = Dot(color=COLOR_FEEDBACK, radius=0.08)
-
-        # 使用和连接线同样的曲线路径 (stroke_width=0 不可见)
-        path3a = CurvedArrow(
-            fb.get_left() + DOWN * 0.1,
-            scan_ctrl.get_top() + UP * 0.1,
-            angle=PI / 3.5, color=COLOR_FEEDBACK, stroke_width=0,
-        )
-        path3b = CurvedArrow(
-            fb.get_bottom() + DOWN * 0.1,
-            gap_ctrl.get_top() + UP * 0.1,
-            angle=-PI / 3.5, color=COLOR_FEEDBACK, stroke_width=0,
-        )
-
-        self.play(
-            MoveAlongPath(dot3a, path3a),
-            MoveAlongPath(dot3b, path3b),
-            run_time=2, rate_func=linear,
-        )
-        self.play(FadeOut(dot3a), FadeOut(dot3b), FadeOut(dot2), run_time=0.2)
+        # dot3a = Dot(color=COLOR_FEEDBACK, radius=0.08)
+        # dot3b = Dot(color=COLOR_FEEDBACK, radius=0.08)
+        # path3a = CurvedArrow(
+        #     fb.get_left() + DOWN * 0.1,
+        #     scan_ctrl.get_top() + UP * 0.1,
+        #     angle=PI / 3.5, color=COLOR_FEEDBACK, stroke_width=0,
+        # )
+        # path3b = CurvedArrow(
+        #     fb.get_bottom() + DOWN * 0.1,
+        #     gap_ctrl.get_top() + UP * 0.1,
+        #     angle=-PI / 3.5, color=COLOR_FEEDBACK, stroke_width=0,
+        # )
+        # self.play(
+        #     MoveAlongPath(dot3a, path3a),
+        #     MoveAlongPath(dot3b, path3b),
+        #     run_time=2, rate_func=linear,
+        # )
+        # self.play(FadeOut(dot3a), FadeOut(dot3b), FadeOut(dot2), run_time=0.2)
 
         # 阶段4: 扫描控制 → 三维扫描器
-        dot4 = Dot(color=COLOR_SIGNAL, radius=0.08)
-        path4 = CurvedArrow(
-            scan_ctrl.get_left() + LEFT * 0.1,
-            scanner.get_right() + RIGHT * 0.1 + UP * 0.4,
-            angle=PI / 3, color=COLOR_SIGNAL, stroke_width=0,
-        )
-        self.play(MoveAlongPath(dot4, path4), run_time=1.2, rate_func=linear)
-        self.play(FadeOut(dot4), run_time=0.15)
+        # dot4 = Dot(color=COLOR_SIGNAL, radius=0.08)
+        # path4 = CurvedArrow(
+        #     scan_ctrl.get_left() + LEFT * 0.1,
+        #     scanner.get_right() + RIGHT * 0.1 + UP * 0.4,
+        #     angle=PI / 3, color=COLOR_SIGNAL, stroke_width=0,
+        # )
+        # self.play(MoveAlongPath(dot4, path4), run_time=1.2, rate_func=linear)
+        # self.play(FadeOut(dot4), run_time=0.15)
 
         scanner_body = scanner[0]
         self.play(scanner_body.animate.set_fill(opacity=0.5).set_color(YELLOW), run_time=0.3)
         self.play(scanner_body.animate.set_fill(opacity=0.2).set_color(COLOR_SCANNER), run_time=0.3)
 
         # 阶段5: 物理反馈 (扫描器 → 探针)
-        dot5 = Dot(color=COLOR_SCANNER, radius=0.08)
-        sc_left = scanner.get_left() + LEFT * 0.2
-        probe_tip = probe[3].get_center()
-        sample_center = probe[0].get_center()
-
-        feedback_path = VMobject()
-        feedback_path.set_points_as_corners([
-            sc_left + DOWN * 0.3,
-            sc_left + DOWN * 1.5,
-            sample_center + LEFT * 1.2,
-            probe_tip,
-        ])
-        self.play(MoveAlongPath(dot5, feedback_path), run_time=1.8, rate_func=linear)
-        self.play(FadeOut(dot5), run_time=0.15)
+        # dot5 = Dot(color=COLOR_SCANNER, radius=0.08)
+        # sc_left = scanner.get_left() + LEFT * 0.2
+        # probe_tip = probe[3].get_center()
+        # feedback_path = Line(
+        #     sc_left + DOWN * 0.3,
+        #     probe_tip,
+        #     stroke_width=0,
+        # )
+        # self.play(MoveAlongPath(dot5, feedback_path), run_time=1.2, rate_func=linear)
+        # self.play(FadeOut(dot5), run_time=0.15)
 
         # 探针闪烁表示受到物理作用
         probe_tip_mobj = probe[3]
@@ -387,8 +381,8 @@ class AFMSystemDiagram(Scene):
         surface_label = Text("样品", font_size=18, color=WHITE).next_to(surface, DOWN, buff=0.1)
 
         cantilever = Line((-0.8, 0.5, 0), (0, 0.5, 0), color=GREY, stroke_width=4)
-        tip = Polygon((-0.05, 0.5, 0), (0.05, 0.5, 0), (0, 0, 0),
-                      color=COLOR_PROBE, fill_opacity=1)
+        tip = Polygon((-0.05, 0.2, 0), (0.05, 0.2, 0), (0, 0, 0),
+                      color=COLOR_PROBE, fill_opacity=1).next_to(cantilever, DOWN+RIGHT, buff=0)
         probe_label = Text("探针", font_size=18, color=COLOR_PROBE).next_to(cantilever, UP, buff=0.1)
 
         fixture = Rectangle(width=0.3, height=0.6, color=GREY, fill_opacity=0.5)

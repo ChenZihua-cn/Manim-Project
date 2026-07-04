@@ -375,8 +375,10 @@ class Scene3_afm_adjust(Scene):
         # ---- V-shaped cantilever geometry ----
         # Two arms forming a V opening upward
         v_tip = np.array([0.0, -1.8, 0])
-        v_left_top = np.array([-2.2, 1.2, 0])
-        v_right_top = np.array([2.2, 1.2, 0])
+        # ±45° arms: left arm at 135° (up-left), right arm at 45° (up-right)
+        # With tip at y=-1.8 and top at y=1.2, height=3.0 → half-width at top = 3.0
+        v_left_top = np.array([-3.0, 1.2, 0])
+        v_right_top = np.array([3.0, 1.2, 0])
         arm_width = 0.25  # thickness of each arm
 
         # Left arm polygon (approximate a thick line as a narrow polygon)
