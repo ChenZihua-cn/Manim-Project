@@ -27,7 +27,7 @@ COLOR_PROBE_TIP = "#222222"
 COLOR_PAPER = "#EEEEEE"
 COLOR_DIFFRACTION = "#FF590083"
 COLOR_ROUND_SPOT = "#FF4444"
-COLOR_GREEN = "#43A047"
+COLOR_BLUE = "#0011FF"
 
 """
 这是一张关于原子力显微镜探针的结构示意图
@@ -95,8 +95,8 @@ class Scene1_afm_adjust(Scene):
             color=WHITE, stroke_width=3,
             tip_length=0.15, buff=0
         )
-        up_line = Line(chip.get_corner(UP + RIGHT), [arrow_x, arrow_top_y, 0])
-        bot_line = Line(chip.get_corner(DOWN + RIGHT), [arrow_x, arrow_bot_y, 0])
+        up_line = Line(chip.get_corner(UP + RIGHT), np.array([arrow_x, arrow_top_y, 0]))
+        bot_line = Line(chip.get_corner(DOWN + RIGHT), np.array([arrow_x, arrow_bot_y, 0]))
 
         chip_annotation = VGroup(arrow_0, up_line, bot_line)
 
@@ -643,6 +643,299 @@ class Scene3_afm_adjust(Scene):
             FadeOut(cantilever_group), FadeOut(cantilever_label),
             FadeOut(all_dots), FadeOut(all_labels),
             FadeOut(paper), FadeOut(paper_label),
+            FadeOut(laser_group),
+            #  FadeOut(trace), 
+            FadeOut(scan_title),
+            FadeOut(summary),
+            run_time=0.8
+        )
+        if current_pattern_mob is not None:
+            self.play(FadeOut(current_pattern_mob), run_time=0.3)
+
+class Scene4_afm_adjust(Scene):
+    """Scene 3 的另一种视频实现形式"""
+    def construct(self):
+        # ---- V-shaped cantilever geometry ----
+        # Two arms forming a V opening upward
+        v_tip = np.array([0.0, -1.8, 0])
+        # ±45° arms: left arm at 135° (up-left), right arm at 45° (up-right)
+        # With tip at y=-1.8 and top at y=1.2, height=3.0 → half-width at top = 3.0
+        v_left_top = np.array([-3.0, 1.2, 0])
+        v_right_top = np.array([3.0, 1.2, 0])
+        arm_width = 0.25  # thickness of each arm
+
+        # Left arm polygon (approximate a thick line as a narrow polygon)
+        left_dir = v_tip - v_left_top
+        left_dir_n = left_dir / np.linalg.norm(left_dir)
+        left_perp = np.array([-left_dir_n[1], left_dir_n[0], 0]) * arm_width
+
+        ArmShift = 0.18
+
+        left_arm = Polygon(
+            v_left_top + left_perp,
+            v_left_top - left_perp,
+            v_tip - left_perp,
+            v_tip + left_perp,
+            color=COLOR_CANTILEVER, fill_opacity=1, stroke_width=1.5
+        ).shift(ArmShift*(RIGHT+DOWN))
+
+        # Right arm polygon
+        right_dir = v_tip - v_right_top
+        right_dir_n = right_dir / np.linalg.norm(right_dir)
+        right_perp = np.array([-right_dir_n[1], right_dir_n[0], 0]) * arm_width
+
+        right_arm = Polygon(
+            v_right_top + right_perp,
+            v_right_top - right_perp,
+            v_tip - right_perp,
+            v_tip + right_perp,
+            color=COLOR_CANTILEVER, fill_opacity=1, stroke_width=1.5
+        ).shift(ArmShift*(LEFT+DOWN))
+
+        cantilever_group = VGroup(left_arm, right_arm)
+        cantilever_label = Text("V型悬臂 (放大)", font_size=24, color=WHITE)
+        cantilever_label.next_to(cantilever_group, UP, buff=0.5)
+
+        # ---- Position dots A-J along the V ----
+        # Left arm: A(top) -> B -> C -> D(near tip)
+        # Gap:   E (center gap)
+        # Right arm: F(near tip) -> G -> H -> I(top)
+        # Tip:   J (V-tip)
+
+        def left_arm_pos(t):
+            """t: 0=top, 1=tip"""
+            return v_left_top + t * (v_tip - v_left_top)
+
+        def right_arm_pos(t):
+            """t: 0=top, 1=tip"""
+            return v_right_top + t * (v_tip - v_right_top)
+
+        # Position definitions
+        # Main positions on the centerline of each arm
+        # Edge positions AB/BC/CD/DJ are on the interior-facing edge of the left arm
+        # (centerline + left_perp), where the laser hits the cantilever boundary → diffraction
+        positions = {
+            "A": left_arm_pos(0.05),
+            "AB": left_arm_pos(0.15) + left_perp,
+            "B": left_arm_pos(0.25),
+            "BC": left_arm_pos(0.40) + left_perp,
+            "C": left_arm_pos(0.55),
+            "CD": left_arm_pos(0.685) + left_perp,
+            "D": left_arm_pos(0.82),
+            "DJ": left_arm_pos(0.91) - left_perp,
+            "JF": right_arm_pos(0.91) + right_perp,
+            "E": np.array([0.0, 0.2, 0]),   # gap center
+            "F": right_arm_pos(0.82),
+            "G": right_arm_pos(0.55),
+            "H": right_arm_pos(0.25),
+            "I": right_arm_pos(0.05),
+            "J": v_tip + np.array([0.0, -0.05, 0]),
+            "VTIP": v_tip+ np.array([0.0, -0.4, 0]),
+        }
+
+        # Spot types
+        no_spot_positions = {"E"}
+        diffraction_positions = {"AB", "BC", "CD", "DJ", "JF"}
+        left_arm_diffraction = {"AB", "BC", "CD", "DJ"}
+        right_arm_diffraction = {"JF"}
+
+        round_spot_positions = {"A", "B", "C", "D", "J", "F"}
+        cross_spot_positions = {"VTIP"}
+
+        # ---- Create position dots and labels ----
+        # Edge points (AB, BC, CD, DJ) are transition waypoints — not shown
+        pos_dots = {}
+        pos_labels = {}
+        for name, pos in positions.items():
+            if name in {"AB", "BC", "CD", "DJ", "JF", "VTIP"}:
+                continue
+            dot = Dot(pos, radius=0.06, color=WHITE)
+            label = Text(name, font_size=16, color=WHITE)
+            # Place labels offset from the dot
+            if name in {"A", "B", "C", "D"}:
+                label.next_to(dot, LEFT, buff=0.12)
+            elif name in {"F", "G", "H", "I"}:
+                label.next_to(dot, RIGHT, buff=0.12)
+            elif name == "E":
+                label.next_to(dot, UP, buff=0.12)
+            else:  # J
+                label.next_to(dot, DOWN, buff=0.12)
+            pos_dots[name] = dot
+            pos_labels[name] = label
+
+        all_dots = VGroup(*pos_dots.values())
+        all_labels = VGroup(*pos_labels.values())
+
+        """
+        # ---- Paper screen (right side) ----
+        paper = Rectangle(width=1.8, height=2.2, color=COLOR_PAPER,
+                         fill_opacity=0.9, stroke_width=2)
+        paper.move_to(np.array([4.2, -0.3, 0]))
+        paper_label = Text("白纸 / 光屏", font_size=20, color=BLACK)
+        paper_label.next_to(paper, UP, buff=0.15)
+        # Spot patterns on paper (created dynamically per position)
+        
+        # No-spot indicator
+        no_spot_text = Text("无光斑", font_size=22, color=BLACK)
+        no_spot_text.move_to(paper.get_center())
+        """
+        # ---- Laser scanning dot ----
+        x = ValueTracker(positions["D"][0])
+        y = ValueTracker(positions["D"][1])
+        laser_dot = Dot((x.get_value(), y.get_value(), 0), radius=0.1, color=COLOR_LASER_SPOT)
+        laser_glow_dot = Dot((x.get_value(), y.get_value(), 0), radius=0.18, color=COLOR_LASER_SPOT, fill_opacity=0.25)
+        laser_dot.add_updater(lambda d: d.move_to((x.get_value(), y.get_value(), 0)))
+        laser_glow_dot.add_updater(lambda g: g.move_to(laser_dot.get_center()))
+        laser_group = VGroup(laser_glow_dot, laser_dot)
+
+        # ---- Animation sequence ----
+        # Draw cantilever
+        self.play(FadeIn(cantilever_group), Write(cantilever_label), run_time=0.5)
+
+        # Draw position labels
+        self.play(FadeIn(all_dots), Write(all_labels), run_time=0.5)
+        self.wait(0.3)
+        """
+        # Draw paper screen
+        self.play(FadeIn(paper), Write(paper_label), run_time=0.5)
+        """
+        # Title
+        scan_title = Text("激光扫描悬臂校准", font_size=28, color=WHITE)
+        scan_title.to_edge(UP, buff=0.3)
+        self.play(Write(scan_title), run_time=0.8)
+        self.play(FadeIn(laser_group), run_time=0.5)
+
+        # trace = TracedPath(laser_dot.get_center, stroke_color=YELLOW, stroke_width=2)
+        # self.add(trace)
+
+        # ---- Step through positions ----
+        scan_order = ["D", "DJ", "VTIP", "J"]
+
+        # Track the current pattern mobject
+        current_pattern_mob = None
+
+        for name in scan_order:
+            target_pos = positions[name]
+
+            # Prepare spot pattern for this position
+            new_pattern = None
+            if name in no_spot_positions:
+                """
+                new_pattern = no_spot_text.copy()
+                """
+                no_spot_text = Text("无光斑", font_size=22, color=BLACK).move_to(np.array([4.2, -0.3, 0]))
+                new_pattern = no_spot_text
+            elif name in diffraction_positions:
+                new_pattern = Ellipse(width=0.12, height=0.5, color=COLOR_BLUE,
+                                     fill_opacity=0.9, stroke_width=0)
+                if name == "JF":
+                    # new_pattern.rotate(PI / 4).move_to(paper.get_center())
+                    new_pattern.rotate(PI/4).move_to(positions["JF"])
+                else:
+                    # new_pattern.rotate(-PI / 4).move_to(paper.get_center())
+                    new_pattern.rotate(-PI / 4).move_to(positions[name])
+            elif name in round_spot_positions:
+                if name != "J":
+                    """
+                    glow = Dot(paper.get_center(), radius=0.2,
+                            color=COLOR_ROUND_SPOT, fill_opacity=0.3)
+                    spot = Dot(paper.get_center(), radius=0.12, color=COLOR_ROUND_SPOT)
+                    new_pattern = VGroup(glow, spot)"""
+                    glow = Dot(positions[name], radius=0.2,
+                            color=COLOR_BLUE, fill_opacity=0.3)
+                    spot = Dot(positions[name], radius=0.12, color=COLOR_BLUE)
+                    new_pattern = VGroup(glow, spot)
+
+                else:
+                    """
+                    glow = Dot(paper.get_center(), radius=0.2,
+                            color=COLOR_ROUND_SPOT, fill_opacity=0.3)
+                    spot = Dot(paper.get_center(), radius=0.12, color=COLOR_ROUND_SPOT)
+                    new_pattern = VGroup(glow, spot)"""
+                    J_pattern_shift = 0.2*DOWN
+                    glow = Dot(positions[name] + J_pattern_shift, radius=0.2,
+                            color=COLOR_BLUE, fill_opacity=0.3)
+                    spot = Dot(positions[name] + J_pattern_shift, radius=0.12, color=COLOR_BLUE)
+                    new_pattern = VGroup(glow, spot)
+
+            elif name in cross_spot_positions:
+                dj_ellipse = Ellipse(width=0.12, height=0.5, color=COLOR_BLUE,
+                                     fill_opacity=0.9, stroke_width=0)
+                dj_ellipse.rotate(-PI / 4)
+                jf_ellipse = Ellipse(width=0.12, height=0.5, color=COLOR_BLUE,
+                                     fill_opacity=0.9, stroke_width=0)
+                jf_ellipse.rotate(PI / 4)
+                # new_pattern = VGroup(dj_ellipse, jf_ellipse).move_to(paper.get_center())
+                new_pattern = VGroup(dj_ellipse, jf_ellipse).move_to(positions["VTIP"])
+
+            # Fade out old pattern
+            if current_pattern_mob is not None:
+                self.play(FadeOut(current_pattern_mob, run_time=0.3))
+
+            """
+            # PID-style movement toward target with jitter
+            for _ in range(18):
+                error_x = target_pos[0] - x.get_value()
+                error_y = target_pos[1] - y.get_value()
+                jitter = 0.25 * (abs(error_x) + abs(error_y)) / 8
+                new_x = x.get_value() + error_x * 0.15 + np.random.uniform(-jitter, jitter)
+                new_y = y.get_value() + error_y * 0.15 + np.random.uniform(-jitter, jitter)
+                self.play(
+                    x.animate.set_value(new_x),
+                    y.animate.set_value(new_y),
+                    run_time=0.06,
+                    rate_func=linear
+                )
+
+            # Final snap to exact target
+            self.play(
+                x.animate.set_value(target_pos[0]),
+                y.animate.set_value(target_pos[1]),
+                run_time=0.3
+            )
+            """
+
+            if new_pattern is not None:
+                self.play(FadeIn(new_pattern), run_time=0.4)
+
+            current_pattern_mob = new_pattern
+
+            # Add note for special positions
+            note = None
+            if name in no_spot_positions:
+                note = Text("激光未照射悬臂 → 无光斑", font_size=20, color=GREY)
+            elif name in diffraction_positions:
+                note = Text("边缘衍射 → 长条状光斑", font_size=20, color=COLOR_DIFFRACTION)
+            elif name in round_spot_positions:
+                note = Text("全反射 → 明亮圆光斑", font_size=20, color=GREEN)
+                if name == "J":
+                    note = Text("尖端背面全反射 → 明亮圆光斑 ✓", font_size=20, color=GREEN)
+            elif name in cross_spot_positions:
+                note = Text("尖端十字光斑 → 精准对准", font_size=20, color=COLOR_DIFFRACTION)
+
+            if note:
+                note.to_edge(DOWN, buff=0.4)
+                self.play(Write(note), run_time=0.5)
+                self.wait(0.4)
+                self.play(FadeOut(note), run_time=0.3)
+
+            self.wait(0.2)
+
+        # ---- Summary ----
+        summary = VGroup(
+            Text("校准完成：激光精准对准悬臂尖端", font_size=28, color=GREEN),
+            Text("十字光斑 → 精准对准 ✓", font_size=24, color=WHITE),
+        ).arrange(DOWN, buff=0.3)
+        summary.to_edge(DOWN, buff=0.5)
+
+        self.play(Write(summary), run_time=1.5)
+        self.wait(1.0)
+
+        # Fade out
+        self.play(
+            FadeOut(cantilever_group), FadeOut(cantilever_label),
+            FadeOut(all_dots), FadeOut(all_labels),
+            # FadeOut(paper), FadeOut(paper_label),
             FadeOut(laser_group),
             #  FadeOut(trace), 
             FadeOut(scan_title),

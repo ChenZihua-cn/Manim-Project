@@ -168,6 +168,11 @@ class Scene5_ForceCurve(Scene):
             f = self._vdw_force(z)
             return np.clip(f, self.VDW_CUTOFF[0], self.VDW_CUTOFF[1])
         
+        # 生成 x 值数组
+        x_values = np.linspace(0.7, 3, 100)
+        # 计算对应的 y 值
+        y_values = vdw_clipped(x_values)
+
         curve = axes.plot(
             vdw_clipped,
             x_range=[0.7, 3],
