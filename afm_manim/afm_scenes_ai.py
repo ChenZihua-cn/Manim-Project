@@ -954,6 +954,139 @@ class Scene5_AFMForceCurve(Scene):
 
 
 # =============================================================================
+# 镜头6：AFM悬臂梁3D展示 (Termux 3D Scene)
+# =============================================================================
+class Scene6_Cuboid3D(ThreeDScene):
+    """
+    AFM悬臂梁3D: 固定基座 → 矩形主体 → 单坡屋脊尖端(tip_of_cantilever)
+                   → 圆锥原子探针 → 样品表面
+    边长 z(厚度) < y(宽度) < x(长度)
+    摄像机 +x 轴朝向负x, 尖端+探针靠近镜头
+    """
+
+    LENGTH_X = 4.0
+    LENGTH_Y = 1.5
+    LENGTH_Z = 0.35
+    TIP_LEN  = 0.6   # 尖端沿 x 长度
+    ROOF_RISE = 0.18 # 右脊高出顶面
+    PROBE_H  = 0.8   # 探针长度
+    PROBE_R  = 0.22  # 探针底面半径
+
+    def construct(self):
+        self.set_camera_orientation(phi=0, theta=-PI / 2, zoom=0.85)
+
+        hx = self.LENGTH_X / 2
+        hy = self.LENGTH_Y / 2
+        hz = self.LENGTH_Z / 2
+        tl = self.TIP_LEN
+        rr = self.ROOF_RISE
+
+        face_style = dict(
+            fill_color=BLUE_E, fill_opacity=0.40,
+            stroke_color=WHITE, stroke_width=1.5,
+        )
+
+        # ── 1. 固定基座 ──────────────────────────────────────────
+        base = Prism(
+            dimensions=[0.6, self.LENGTH_Y + 0.3, self.LENGTH_Z + 0.5],
+            fill_color=DARKER_GREY, fill_opacity=0.9,
+            stroke_color=GREY_BROWN, stroke_width=1.5,
+        ).move_to([-hx - 0.25, 0, 0])
+        self.play(Create(base), run_time=0.8)
+
+        # ── 2. 悬臂梁主体 ────────────────────────────────────────
+        body = Prism(
+            dimensions=[self.LENGTH_X - tl, self.LENGTH_Y, self.LENGTH_Z],
+            fill_color=BLUE_E, fill_opacity=0.40,
+            stroke_color=WHITE, stroke_width=2,
+        ).move_to([-tl / 2, 0, 0])
+        self.play(Create(body), run_time=1.2)
+
+        # ── 3. tip_of_cantilever: 单坡尖端 ─────────────────────
+        # 后端 (x0): 矩形 ABCD 接主体 — 前端 (x1): 左檐H平坦, 右脊I翘起
+        x0, x1 = hx - tl, hx
+
+        A, B = np.array([x0, -hy, -hz]), np.array([x0, hy, -hz])
+        C, D = np.array([x0,  hy,  hz]), np.array([x0, -hy, hz])
+        E, F = np.array([x1, -hy, -hz]), np.array([x1, hy, -hz])
+        H    = np.array([x1, -hy,  hz])       # 左檐 (平坦)
+        I    = np.array([x1,  hy,  hz + rr])  # 右脊 (翘起)
+
+        tip_of_cantilever = VGroup(
+            Polygon(A, B, F, E, **face_style),  # bottom
+            Polygon(A, E, H, D, **face_style),  # left
+            Polygon(B, F, I, C, **face_style),  # right (tall)
+            Polygon(D, H, I,    **face_style),  # roof
+        )
+        self.play(Create(tip_of_cantilever), run_time=1.2)
+
+        # ── 4. 原子探针 (圆锥, 右脊正下方) ──────────────────────
+        apex = np.array([x1, hy, -hz - self.PROBE_H])
+        tip_cone = Cone(
+            base_radius=self.PROBE_R, height=self.PROBE_H,
+            direction=DOWN, resolution=(32, 32),
+            fill_color=YELLOW_E, fill_opacity=0.85,
+            stroke_color=GOLD, stroke_width=1,
+        ).move_to([x1, hy, -hz - self.PROBE_H / 2])
+
+        tip_atom = Sphere(radius=0.06, fill_color=RED, fill_opacity=1).move_to(apex)
+        orbit = Circle(
+            radius=0.14, color=ORANGE, stroke_width=1.5,
+        ).move_to(apex).rotate(PI / 2, axis=UP)
+
+        self.play(
+            Create(tip_cone),
+            FadeIn(tip_atom, scale=1.5),
+            Create(orbit),
+            run_time=1.5,
+        )
+
+        # ── 5. 样品表面 + 范德华力 ───────────────────────────────
+        surf_z = apex[2] - 0.25
+        sample = Rectangle(
+            width=self.LENGTH_X + 2, height=self.LENGTH_Y + 0.8,
+            fill_color=GREEN_E, fill_opacity=0.3,
+            stroke_color=COLOR_DETECTOR, stroke_width=2,
+        ).move_to([0, 0, surf_z]).rotate(PI / 2, axis=UP)
+
+        vdw_line = DashedLine(
+            apex, [x1, hy, surf_z],
+            color=COLOR_VDW, stroke_width=2, dash_length=0.08,
+        )
+        vdw_label = MathTex(r"F_{\text{vdW}}", font_size=24, color=COLOR_VDW)
+        vdw_label.move_to([x1 + 0.55, hy, (apex[2] + surf_z) / 2])
+
+        self.play(FadeIn(sample), run_time=0.6)
+        self.play(Create(vdw_line), Write(vdw_label), run_time=0.9)
+
+        # ── 6. 不等式 ────────────────────────────────────────────
+        inequality = MathTex(r"z < y < x", font_size=56)
+        inequality.set_color_by_tex("z", BLUE)
+        inequality.set_color_by_tex("y", GREEN)
+        inequality.set_color_by_tex("x", RED)
+        inequality.to_edge(UP, buff=0.3)
+        self.play(Write(inequality), run_time=1)
+        self.wait(0.5)
+
+        # ── 7. 摄像机环绕 ────────────────────────────────────────
+        self.move_camera(
+            phi=70 * DEGREES, theta=-60 * DEGREES, zoom=0.6,
+            run_time=5, rate_func=smooth,
+        )
+        self.wait(0.5)
+
+        # ── 8. 淡出 ──────────────────────────────────────────────
+        self.play(
+            *[FadeOut(o) for o in (
+                base, body, tip_of_cantilever,
+                tip_cone, tip_atom, orbit,
+                sample, vdw_line, vdw_label, inequality,
+            )],
+            run_time=1,
+        )
+
+
+# =============================================================================
 # 主渲染入口（可选：用于连续渲染所有场景）
 # =============================================================================
 if __name__ == "__main__":
