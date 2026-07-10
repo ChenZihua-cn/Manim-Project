@@ -51,22 +51,18 @@ class Scene4_FrequencyShiftDetection(Scene):
 # 随着探针移动，平衡点也在轴上移动
 
 class Scene5_ForceCurve(Scene):
-    Z_RANGE = (0.5, 2.0)          # 距离范围 (nm)
-    FORCE_RANGE = (-2, 6)         # 力范围 (nN)
-    A0 = 1.2                      # a₀ — 接触过渡距离 (z+z_s = a₀ 处分界)
-    Z_S = 0.28                    # z_s — 距离偏移量
-    VDW_COEFF = 0.5               # C = HR/6 — 范德华吸引系数
-    CONTACT_COEFF = 20.0          # K = (4/3)E_eff √R — Hertz 排斥刚度
+    Z_RANGE = (0.5, 2.5)          # 距离范围 (nm)，右端拉长展示远处趋近于零
+    FORCE_RANGE = (-5, 5)       # 力范围 (nN)，z→0.5 时排斥力 ~12 nN
+    VDW_COEFF = 1.5               # C — 范德华吸引系数
+    REPULSION_COEFF = 1.1         # K — 短程排斥系数，选配使得平衡点在 z=0.85
     EQUILIBRIUM_Z = 0.85          # 平衡点位置
     VIBRATION_CYCLES = 2          # 振动周期数
     VIBRATION_AMPLITUDE = 0.05    # 振动幅度
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.a0 = self.A0
-        self.z_s = self.Z_S
         self.vdw_coeff = self.VDW_COEFF
-        self.contact_coeff = self.CONTACT_COEFF
+        self.repulsion_coeff = self.REPULSION_COEFF
     
     def cantilever_model(self) -> VGroup:
         """悬臂梁+探针尖端+尖端原子，返回居中于 ORIGIN 的 VGroup"""
@@ -112,35 +108,44 @@ class Scene5_ForceCurve(Scene):
 
         formula = MathTex(
             r"F(z) = \begin{cases} "
-            r"\dfrac{HR}{6(D)^2}, & D > a_0 \\[1em] "
+            r"\dfrac{HR}{6 D^2}, & D > a_0 \\[1em] "
             r"\dfrac{HR}{6a_0^2} + \dfrac{4}{3} E_{\rm eff} \sqrt{R}\, (a_0 - D)^{3/2}, & D \leq a_0 "
             r"\end{cases}",
             font_size=36, color=WHITE
-            ).scale(0.8)
+        ).scale(0.8)
         formula.to_edge(RIGHT, buff=1.0)
         return formula
 
-    def _vdw_component(self, z: float | np.ndarray) -> np.ndarray:
-        """范德华吸引项: -C / (z + z_s)²"""
-        d = np.asarray(z) + self.z_s
-        return -self.vdw_coeff / (d ** 2)
+    # def _vdw_component(self, z: float | np.ndarray) -> np.ndarray:
+    #     """范德华吸引项: -C / (z + z_s)²"""
+    #     d = np.asarray(z) + self.z_s
+    #     return -self.vdw_coeff / (d ** 2)
 
-    def _contact_component(self, z: float | np.ndarray) -> np.ndarray:
-        """Hertz 接触排斥项: K · (a₀ - z - z_s)^(3/2)，仅接触区非零"""
-        d = np.asarray(z) + self.z_s
-        result = np.zeros_like(d, dtype=float)
-        mask = d <= self.a0
-        result[mask] = self.contact_coeff * (self.a0 - d[mask]) ** 1.5
-        return result
+    # def _contact_component(self, z: float | np.ndarray) -> np.ndarray:
+    #     """Hertz 接触排斥项: K · (a₀ - z - z_s)^(3/2)，仅接触区非零"""
+    #     d = np.asarray(z) + self.z_s
+    #     result = np.zeros_like(d, dtype=float)
+    #     mask = d <= self.a0
+    #     result[mask] = self.contact_coeff * (self.a0 - d[mask]) ** 1.5
+    #     return result
+
+    # def total_force(self, z: float | np.ndarray) -> float | np.ndarray:
+    #     """合力: 与 force_formula 完全一致的 piecewise 定义"""
+    #     scalar = np.isscalar(z)
+    #     d = np.atleast_1d(np.asarray(z) + self.z_s)
+    #     vdw_at_a0 = self.vdw_coeff / (self.a0 ** 2)
+    #     result = -self.vdw_coeff / (d ** 2)
+    #     mask_contact = d <= self.a0
+    #     result[mask_contact] = -vdw_at_a0 + self.contact_coeff * (self.a0 - d[mask_contact]) ** 1.5
+    #     if scalar:
+    #         return float(result[0])
+    #     return result
 
     def total_force(self, z: float | np.ndarray) -> float | np.ndarray:
-        """合力: 与 force_formula 完全一致的 piecewise 定义"""
+        """合力: F(z) = -C/z² + K/z⁴，长程 VDW 吸引 + 短程 z⁻⁴ 排斥发散"""
         scalar = np.isscalar(z)
-        d = np.atleast_1d(np.asarray(z) + self.z_s)
-        vdw_at_a0 = self.vdw_coeff / (self.a0 ** 2)
-        result = -self.vdw_coeff / (d ** 2)
-        mask_contact = d <= self.a0
-        result[mask_contact] = -vdw_at_a0 + self.contact_coeff * (self.a0 - d[mask_contact]) ** 1.5
+        z_arr = np.atleast_1d(np.asarray(z))
+        result = -self.vdw_coeff / (z_arr ** 2) + self.repulsion_coeff / (z_arr ** 4)
         if scalar:
             return float(result[0])
         return result
@@ -157,7 +162,7 @@ class Scene5_ForceCurve(Scene):
             x_length=8, y_length=4,
             axis_config={"include_tip": False},
             x_axis_config={"numbers_to_include": [1, 2]},
-            y_axis_config={"numbers_to_include": [-1, 0, 2, 4]}
+            y_axis_config={"numbers_to_include": [-5, -2.5, 0, 2.5, 5]}
         ).scale(0.8).to_edge(RIGHT, buff=0.5).shift(DOWN * 0.5)
         
         labels = VGroup(
@@ -166,46 +171,46 @@ class Scene5_ForceCurve(Scene):
         )
         return axes, labels
     
-    def create_vdw_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
-        """创建范德华力曲线及其标签"""
-        curve = axes.plot(
-            lambda z: float(self._vdw_component(z)),
-            x_range=[0.7, 2],
-            color=COLOR_VDW,
-            stroke_width=3
-        )
-        # 标签紧挨曲线（z=1.5附近，曲线y≈-0.17的位置）
-        label = MathTex(r"F_{\text{vdW}} \propto -1/(z+z_s)^2", color=COLOR_VDW, font_size=26)
-        label.move_to(axes.c2p(1.5, -0.45))
+    # def create_vdw_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
+    #     """创建范德华力曲线及其标签"""
+    #     curve = axes.plot(
+    #         lambda z: float(self._vdw_component(z)),
+    #         x_range=[0.7, 2],
+    #         color=COLOR_VDW,
+    #         stroke_width=3
+    #     )
+    #     # 标签紧挨曲线（z=1.5附近，曲线y≈-0.17的位置）
+    #     label = MathTex(r"F_{\text{vdW}} \propto -1/(z+z_s)^2", color=COLOR_VDW, font_size=26)
+    #     label.move_to(axes.c2p(1.5, -0.45))
+    #
+    #     return curve, label
 
-        return curve, label
-
-    def create_contact_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
-        """创建 Hertz 接触排斥力曲线及其标签"""
-        curve = axes.plot(
-            lambda z: float(self._contact_component(z)),
-            x_range=[0.5, 2],
-            color=COLOR_PAULI,
-            stroke_width=3
-        )
-        # 标签紧贴曲线上升段（z=0.7处）
-        label = MathTex(r"F_{\text{Hertz}}"
-                        r"\propto (a_0 - z - z_s)^{3/2}" , color=COLOR_PAULI, font_size=26)
-        label.move_to(axes.c2p(0.75, 4.8)).shift(RIGHT*0.4)
-
-        return curve, label
+    # def create_contact_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
+    #     """创建 Hertz 接触排斥力曲线及其标签"""
+    #     curve = axes.plot(
+    #         lambda z: float(self._contact_component(z)),
+    #         x_range=[0.5, 2.5],
+    #         color=COLOR_PAULI,
+    #         stroke_width=3
+    #     )
+    #     # 标签紧贴曲线上升段（z=0.7处）
+    #     label = MathTex(r"F_{\text{Hertz}}"
+    #                     r"\propto (a_0 - z - z_s)^{3/2}" , color=COLOR_PAULI, font_size=26)
+    #     label.move_to(axes.c2p(0.75, 4.8)).shift(RIGHT*0.4)
+    #
+    #     return curve, label
 
     def create_total_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
-        """创建合力曲线及其标签"""
+        """创建合力曲线及其标签，自然延伸至 F 轴"""
         curve = axes.plot(
             lambda z: float(self.total_force(z)),
-            x_range=[0.5, 2],
+            x_range=[0.5, 2.5],
             color=WHITE,
             stroke_width=4
-        )
+        ).scale(0.9).shift(DOWN+RIGHT*0.4)
         # 标签紧贴合力曲线右侧
         label = MathTex(r"F_{\text{total}}", color=WHITE, font_size=26)
-        label.move_to(axes.c2p(1.6, 0.6))
+        label.move_to(axes.c2p(2.0, 0.6)).shift(DOWN*0.9)
 
         return curve, label
     
@@ -224,39 +229,44 @@ class Scene5_ForceCurve(Scene):
             color=GREY, stroke_width=1, dash_length=0.12
         )
         non_contact = Text("非接触区", font_size=22, color=COLOR_VDW).scale(0.8)
-        non_contact.move_to(axes.c2p(1.6, -1.0))
+        non_contact.move_to(axes.c2p(2.0, -1.0)).shift(DOWN)
         contact = Text("接触区", font_size=22, color=COLOR_PAULI).scale(0.8)
-        contact.move_to(axes.c2p(0.7, 4.5))
+        contact.move_to(axes.c2p(0.65, 10)).shift(DOWN)
         return VGroup(divider, non_contact, contact)
 
-    def create_probe(self, axes: Axes) -> Triangle:
+    def create_probe(self, curve: ParametricFunction) -> Triangle:
         """曲线上工作点标记，初始位于非接触区"""
-        z_start = 1.8
-        f_start = np.clip(float(self.total_force(z_start)), self.FORCE_RANGE[0], self.FORCE_RANGE[1])
+        z_start = self.Z_RANGE[1]
+        z_min, z_max = self.Z_RANGE
+        alpha = (z_start - z_min) / (z_max - z_min)
         probe = Triangle(color=GREY, fill_opacity=1).scale(0.6)
         probe.scale(0.15)
-        probe.move_to(axes.c2p(z_start, f_start))
+        probe.move_to(curve.point_from_proportion(alpha))
         return probe
     
+
     def create_delta_f_display(self) -> tuple[DecimalNumber, MathTex]:
-        """创建频率变化显示"""
+        # 创建频率变化显示
         delta_f = DecimalNumber(0, num_decimal_places=2, color=COLOR_DETECTOR)
         delta_f.to_corner(DR).shift(LEFT * 0.5 + UP * 0.5)
         
-        label = MathTex(r"\Delta f", font_size=30, color=WHITE)
+        label = MathTex(r"\\Delta f", font_size=30, color=WHITE)
         label.next_to(delta_f, LEFT, buff=0.2)
         return delta_f, label
 
-    def animate_vibration(self, axes: Axes, probe: Triangle,
+
+    def animate_vibration(self, curve: ParametricFunction, probe: Triangle,
                           delta_f: DecimalNumber, duration: float) -> None:
-        """工作点沿合力曲线从非接触区移动到接触区"""
-        t = ValueTracker(1.8)
-        z_end = self.EQUILIBRIUM_Z
+        """工作点沿合力曲线从非接触区→平衡点→接触区，两段动画"""
+        t = ValueTracker(self.Z_RANGE[1])
+        z_mid = self.EQUILIBRIUM_Z        # 均衡点（中途暂停）
+        z_end = 0.65                       # 接触区终点
+        z_min, z_max = self.Z_RANGE
 
         def update_probe(mob):
             z = t.get_value()
-            f = np.clip(float(self.total_force(z)), self.FORCE_RANGE[0], self.FORCE_RANGE[1])
-            mob.move_to(axes.c2p(z, f))
+            alpha = (z - z_min) / (z_max - z_min)
+            mob.move_to(curve.point_from_proportion(alpha))
 
         def update_df(mob):
             z = t.get_value()
@@ -266,13 +276,18 @@ class Scene5_ForceCurve(Scene):
         probe.add_updater(update_probe)
         delta_f.add_updater(update_df)
 
-        self.play(t.animate.set_value(z_end), run_time=duration, rate_func=smooth)
+        # 第一段：非接触区 → 均衡点
+        self.play(t.animate.set_value(z_mid), run_time=duration * 0.6, rate_func=smooth)
+        # 在均衡点短暂停顿
+        # self.wait(0.3 * duration)
+        # 第二段：均衡点 → 接触区
+        self.play(t.animate.set_value(z_end), run_time=duration * 0.7, rate_func=smooth)
 
         probe.remove_updater(update_probe)
         delta_f.remove_updater(update_df)
 
         
-    TIME_SCALE = 2.0 / 13 * 10              # 时间缩放因子（>1延长，<1缩短）
+    TIME_SCALE = 2.0              # 时间缩放因子（>1延长，<1缩短）
     def construct(self):
         ts = self.TIME_SCALE
         """
@@ -299,34 +314,26 @@ class Scene5_ForceCurve(Scene):
         axes, axes_labels = self.create_axes()
         self.play(Create(axes), Write(axes_labels), run_time=0.5 * ts)
 
-        # ---- 7. 范德华力曲线 ----
-        vdw_curve, vdw_label = self.create_vdw_curve_group(axes)
-        self.play(Create(vdw_curve), run_time=0.7 * ts)
-        self.play(Write(vdw_label), run_time=0.3 * ts)
-
-        # ---- 8. Hertz 接触排斥力曲线 ----
-        pauli_curve, pauli_label = self.create_contact_curve_group(axes)
-        self.play(Create(pauli_curve), run_time=0.7 * ts)
-        self.play(Write(pauli_label), run_time=0.3 * ts)
-
-        # ---- 9. 合力曲线 ----
+        # ---- 7. 合力曲线（含 VDW 吸引 + Hertz 接触排斥） ----
         total_curve, total_label = self.create_total_curve_group(axes)
-        self.play(Create(total_curve), run_time=0.35 * ts)
-        self.play(Write(total_label), run_time=0.15 * ts)
+        self.play(Create(total_curve), run_time=1.0 * ts)
+        self.play(Write(total_label), run_time=0.3 * ts)
 
-        # ---- 10. 区域标签 ----
+        # ---- 8. 区域标签 ----
         region_labels = self.create_region_labels(axes)
         self.play(FadeIn(region_labels), run_time=0.5 * ts)
 
-        # ---- 11. 平衡点标记 ----
+        # ---- 9. 平衡点标记 ----
         eq_point, eq_label = self.create_equilibrium_marker(axes)
         self.play(FadeIn(eq_point), Write(eq_label), run_time=0.5 * ts)
 
-        # ---- 12. 工作点沿曲线从非接触区移动到接触区 ----
-        probe = self.create_probe(axes)
+        # ---- 10. 工作点沿曲线从非接触区移动到接触区 ----
+        probe = self.create_probe(total_curve)
         delta_f, delta_f_label = self.create_delta_f_display()
-        self.play(FadeIn(probe), FadeIn(delta_f), Write(delta_f_label), run_time=0.4 * ts)
-        self.animate_vibration(axes, probe, delta_f, duration=1.0 * ts)
+        self.play(FadeIn(probe),
+                  # FadeIn(delta_f), Write(delta_f_label),
+                    run_time=0.4 * ts)
+        self.animate_vibration(total_curve, probe, delta_f, duration=3.0 * ts)
         
 class Scene5_AFMForseCurve(Scene):
     pass

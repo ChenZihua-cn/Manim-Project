@@ -1000,7 +1000,7 @@ class Scene6_Cuboid3D(ThreeDScene):
             fill_color=BLUE_E, fill_opacity=1,
             stroke_color=WHITE, stroke_width=1,
         ).move_to(np.array([-tl / 2, 0, 0]))
-        self.play(Create(body), run_time=1.2)
+        self.play(Create(body), run_time=0.6)
 
         # ── 3. tip_of_cantilever: 单坡尖端 ─────────────────────
         # 后端 (x0): 矩形 ABCD 接主体 — 前端 (x1): 左檐H平坦, 右脊I倾斜
@@ -1018,7 +1018,7 @@ class Scene6_Cuboid3D(ThreeDScene):
             Polygon(B, F, I, C, **face_style),  # right (tall)
             Polygon(D, H, I, C, **face_style),  # roof
         )
-        self.play(Create(tip_of_cantilever), run_time=1.2)
+        self.play(Create(tip_of_cantilever), run_time=0.6)
 
         # ── 4. 原子探针 (圆锥, 右脊正下方) ──────────────────────
         apex = np.array([(x1+x0)/2, 0, -hz - self.PROBE_H])
@@ -1034,7 +1034,7 @@ class Scene6_Cuboid3D(ThreeDScene):
             radius=0.04, color=ORANGE, stroke_width=1.5,
         ).move_to(apex)
 
-        self.add(tip_cone, tip_atom, orbit)
+        self.add(tip_cone, tip_atom)
 
 
         # ── 7. 摄像机环绕 ────────────────────────────────────────
@@ -1043,14 +1043,79 @@ class Scene6_Cuboid3D(ThreeDScene):
             run_time=5, rate_func=smooth,
         )
         self.wait(0.5)
+        self.add(orbit)
 
-        # -- 8. 样品表面上升
+        # ── 8. 样品表面上升 ──────────────────────────────────────
+        def sample_surface_height(x, y):
+            """2D高度场：高斯凸起模拟样品表面形貌"""
+            h = 0.0
+            h += 0.20 * np.exp(-(((x - 1.0)**2) / 0.4 + ((y - 0.3)**2) / 0.3))
+            h += 0.30 * np.exp(-(((x - 2.0)**2) / 0.2 + ((y + 0.2)**2) / 0.25))
+            h += 0.25 * np.exp(-(((x + 0.5)**2) / 0.5 + ((y - 0.4)**2) / 0.4))
+            h += 0.22 * np.exp(-(((x + 1.5)**2) / 0.6 + ((y + 0.1)**2) / 0.35))
+            h += 0.18 * np.exp(-(((x - 0.5)**2) / 0.7 + ((y + 0.6)**2) / 0.5))
+            return h
 
-        # ── 8. 淡出 ──────────────────────────────────────────────
+        Z_BASE = -0.75
+        surface = Surface(
+            func=lambda u, v: np.array([u, v, Z_BASE + sample_surface_height(u, v)]),
+            u_range=(-3, 3),
+            v_range=(-1.5, 1.5),
+            resolution=60,
+            fill_color=COLOR_DETECTOR,
+            fill_opacity=0.85,
+            checkerboard_colors=False,
+            stroke_color=ManimColor("#2E7D32"),
+            stroke_width=0.3,
+        )
+        """
+        surface_label = Text("样品表面", font_size=22, color=COLOR_DETECTOR)
+        surface_label.to_corner(DL)"""
+
+        # 表面从下方升入视野（沿Z轴上升）
+        surface.shift(IN * 0.8)
+        self.play(Create(surface))
+        self.play(
+            surface.animate.shift(OUT * 0.8),
+            # Write(surface_label),
+            run_time=1.5,
+        )
+        self.wait(1.0)
+
+
+        # ── 8.5 原子级表面 — 模拟放大后的样品表面 ──────────────
+        # 创建由小球组成的原子阵列平面（棋盘格排列）
+        atom_spheres = VGroup()
+        atom_colors_pair = [BLUE_D, BLUE_C]
+        spacing = 0.32
+        x_vals = np.arange(-2.56, 2.57, spacing)
+        y_vals = np.arange(-1.12, 1.13, spacing)
+        for i, x in enumerate(x_vals):
+            for j, y in enumerate(y_vals):
+                sphere = Sphere(
+                    radius=0.10,
+                    fill_color=atom_colors_pair[(i + j) % 2],
+                    fill_opacity=1,
+                    stroke_width=0.2,
+                    stroke_color=GREY,
+                    resolution=(10, 10),
+                ).move_to(np.array([x, y, Z_BASE + 0.05]))
+                atom_spheres.add(sphere)
+
+        # 同步转场：样品表面淡出 → 原子形貌淡入
+        self.play(
+            FadeOut(surface),
+            FadeIn(atom_spheres),
+            run_time=1.5,
+        )
+
+        # ── 9. 淡出 ──────────────────────────────────────────────
         self.play(
             *[FadeOut(o) for o in (
                 base, body, tip_of_cantilever,
-                tip_cone, tip_atom, orbit
+                tip_cone, tip_atom, orbit,
+                atom_spheres,
+                # surface_label,
             )],
             run_time=1,
         )
