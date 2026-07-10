@@ -51,25 +51,22 @@ class Scene4_FrequencyShiftDetection(Scene):
 # 随着探针移动，平衡点也在轴上移动
 
 class Scene5_ForceCurve(Scene):
-    Z_RANGE = (0.5, 3.0)          # 距离范围 (nm)
-    FORCE_RANGE = (-2, 2)         # 力范围 (nN)，调整以更好展示曲线
-    VDW_CUTOFF = (-3, 1)          # 范德华力显示截断范围
-    DECAY_LEN = 0.3               # 泡利力衰减长度
-    PAULI_AMPLITUDE = 5.0         # 泡利力幅值
+    Z_RANGE = (0.5, 2.0)          # 距离范围 (nm)
+    FORCE_RANGE = (-2, 6)         # 力范围 (nN)
+    A0 = 1.2                      # a₀ — 接触过渡距离 (z+z_s = a₀ 处分界)
+    Z_S = 0.28                    # z_s — 距离偏移量
+    VDW_COEFF = 0.5               # C = HR/6 — 范德华吸引系数
+    CONTACT_COEFF = 20.0          # K = (4/3)E_eff √R — Hertz 排斥刚度
     EQUILIBRIUM_Z = 0.85          # 平衡点位置
     VIBRATION_CYCLES = 2          # 振动周期数
     VIBRATION_AMPLITUDE = 0.05    # 振动幅度
-    VDW_AMPLITUDE = 1.0              # 范德华力幅值 C
-    VDW_CUTOFF_DIST = 0.5            # 短程截断距离（防止奇点）
-    VDW_CUTOFF_VALUE = -100.0        # 截断处返回的力值
-    VDW_CLIP_RANGE = (-3, 1)         # 绘图时力的显示裁剪范围
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.vdw_amplitude = self.VDW_AMPLITUDE
-        self.vdw_cutoff = self.VDW_CUTOFF_DIST
-        self.vdw_cutoff_value = self.VDW_CUTOFF_VALUE
-        self.vdw_clip_range = self.VDW_CLIP_RANGE
+        self.a0 = self.A0
+        self.z_s = self.Z_S
+        self.vdw_coeff = self.VDW_COEFF
+        self.contact_coeff = self.CONTACT_COEFF
     
     def cantilever_model(self) -> VGroup:
         """悬臂梁+探针尖端+尖端原子，返回居中于 ORIGIN 的 VGroup"""
@@ -120,29 +117,34 @@ class Scene5_ForceCurve(Scene):
         formula.to_edge(RIGHT, buff=1.0)
         return formula
 
-    def _vdw_force(self, z: float | np.ndarray) -> np.ndarray:
-        z_arr = np.asarray(z)
-        force = np.full_like(z_arr, self.vdw_cutoff_value, dtype=float)
-        mask = z_arr > self.vdw_cutoff
-        force[mask] = -self.vdw_amplitude / (z_arr[mask] ** 7)
-        return force
+    def _vdw_component(self, z: float | np.ndarray) -> np.ndarray:
+        """范德华吸引项: -C / (z + z_s)²"""
+        d = np.asarray(z) + self.z_s
+        return -self.vdw_coeff / (d ** 2)
 
-    def pauli_force(self, z: float | np.ndarray) -> np.ndarray:
-        z_arr = np.asarray(z)
-        return self.PAULI_AMPLITUDE * np.exp(-2 * z_arr / self.DECAY_LEN)
+    def _contact_component(self, z: float | np.ndarray) -> np.ndarray:
+        """Hertz 接触排斥项: K · (a₀ - z - z_s)^(3/2)，仅接触区非零"""
+        d = np.asarray(z) + self.z_s
+        result = np.zeros_like(d, dtype=float)
+        mask = d <= self.a0
+        result[mask] = self.contact_coeff * (self.a0 - d[mask]) ** 1.5
+        return result
 
-    def total_force(self, z: float | np.ndarray) -> np.ndarray:
-        return self.pauli_force(z) + self._vdw_force(z)
+    def total_force(self, z: float | np.ndarray) -> float | np.ndarray:
+        """合力: 与 force_formula 完全一致的 piecewise 定义"""
+        scalar = np.isscalar(z)
+        d = np.atleast_1d(np.asarray(z) + self.z_s)
+        vdw_at_a0 = self.vdw_coeff / (self.a0 ** 2)
+        result = -self.vdw_coeff / (d ** 2)
+        mask_contact = d <= self.a0
+        result[mask_contact] = -vdw_at_a0 + self.contact_coeff * (self.a0 - d[mask_contact]) ** 1.5
+        if scalar:
+            return float(result[0])
+        return result
 
     def force_derivative(self, z: float, h: float = 0.001) -> float:
-        """使用中心差分，但 h 取较小值，避免跨越截断边界"""
-        # 可选的更鲁棒方法：若 z-h < cutoff，改用前向差分
-        if z - h < self.vdw_cutoff:
-            # 使用前向差分 (f(z+h) - f(z))/h
-            result = (self.total_force(z + h) - self.total_force(z)) / h
-        else:
-            result = (self.total_force(z + h) - self.total_force(z - h)) / (2 * h)
-        return float(result)
+        """中心差分数值求导"""
+        return float((self.total_force(z + h) - self.total_force(z - h)) / (2 * h))
     
     def create_axes(self) -> tuple[Axes, VGroup]:
         """创建坐标轴和标签（仅坐标轴，不含曲线）"""
@@ -151,8 +153,8 @@ class Scene5_ForceCurve(Scene):
             y_range=[*self.FORCE_RANGE, 1],
             x_length=8, y_length=4,
             axis_config={"include_tip": False},
-            x_axis_config={"numbers_to_include": [1, 2, 3]},
-            y_axis_config={"numbers_to_include": [-2, -1, 0, 1, 2]}
+            x_axis_config={"numbers_to_include": [1, 2]},
+            y_axis_config={"numbers_to_include": [-1, 0, 2, 4]}
         ).scale(0.8).to_edge(RIGHT, buff=0.5).shift(DOWN * 0.5)
         
         labels = VGroup(
@@ -163,61 +165,45 @@ class Scene5_ForceCurve(Scene):
     
     def create_vdw_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
         """创建范德华力曲线及其标签"""
-        # 截断函数避免超出显示范围
-        def vdw_clipped(z):
-            f = self._vdw_force(z)
-            return np.clip(f, self.VDW_CUTOFF[0], self.VDW_CUTOFF[1])
-        
-        # 生成 x 值数组
-        x_values = np.linspace(0.7, 3, 100)
-        # 计算对应的 y 值
-        y_values = vdw_clipped(x_values)
-
         curve = axes.plot(
-            vdw_clipped,
-            x_range=[0.7, 3],
+            lambda z: float(self._vdw_component(z)),
+            x_range=[0.7, 2],
             color=COLOR_VDW,
             stroke_width=3
         )
-        # 标签紧挨曲线（z=1.4附近，曲线y≈-0.35的位置）
-        label = MathTex(r"F_{\text{vdW}} \propto -1/z^7", color=COLOR_VDW, font_size=26)
-        label.move_to(axes.c2p(1.5, -0.6))
-        
+        # 标签紧挨曲线（z=1.5附近，曲线y≈-0.17的位置）
+        label = MathTex(r"F_{\text{vdW}} \propto -1/(z+z_s)^2", color=COLOR_VDW, font_size=26)
+        label.move_to(axes.c2p(1.5, -0.45))
+
         return curve, label
-    
-    def create_pauli_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
-        """创建泡利排斥力曲线及其标签"""
-        def pauli_float(z: float) -> float:
-            return float(self.pauli_force(z))
+
+    def create_contact_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
+        """创建 Hertz 接触排斥力曲线及其标签"""
         curve = axes.plot(
-            pauli_float,
-            x_range=[0.5, 3],
+            lambda z: float(self._contact_component(z)),
+            x_range=[0.5, 2],
             color=COLOR_PAULI,
             stroke_width=3
         )
         # 标签紧贴曲线上升段（z=0.7处）
-        label = MathTex(r"F_{\text{Pauli}} \propto e^{-2z/\lambda}", color=COLOR_PAULI, font_size=26)
-        label.move_to(axes.c2p(0.85, 1.5))
-        
+        label = MathTex(r"F_{\text{Hertz}}"
+                        r"\propto (a_0 - z - z_s)^{3/2}" , color=COLOR_PAULI, font_size=26)
+        label.move_to(axes.c2p(0.75, 4.8)).shift(RIGHT*0.4)
+
         return curve, label
-    
+
     def create_total_curve_group(self, axes: Axes) -> tuple[ParametricFunction, MathTex]:
         """创建合力曲线及其标签"""
-        def total_clipped(z: float) -> float:
-            f = self.total_force(z)
-            clipped = np.clip(f, self.FORCE_RANGE[0], self.FORCE_RANGE[1])
-            return float(clipped)
-        
         curve = axes.plot(
-            total_clipped,
-            x_range=[0.7, 3],
+            lambda z: float(self.total_force(z)),
+            x_range=[0.5, 2],
             color=WHITE,
             stroke_width=4
         )
         # 标签紧贴合力曲线右侧
-        label = MathTex(r"F_{\text{total}}", color=WHITE, font_size=22)
-        label.move_to(axes.c2p(1.6, 1.2))
-        
+        label = MathTex(r"F_{\text{total}}", color=WHITE, font_size=26)
+        label.move_to(axes.c2p(1.6, 0.6))
+
         return curve, label
     
     def create_equilibrium_marker(self, axes: Axes) -> tuple[Dot, MathTex]:
@@ -235,16 +221,16 @@ class Scene5_ForceCurve(Scene):
             color=GREY, stroke_width=1, dash_length=0.12
         )
         non_contact = Text("非接触区", font_size=22, color=COLOR_VDW).scale(0.8)
-        non_contact.move_to(axes.c2p(1.8, -1.2))
+        non_contact.move_to(axes.c2p(1.6, -1.0))
         contact = Text("接触区", font_size=22, color=COLOR_PAULI).scale(0.8)
-        contact.move_to(axes.c2p(0.65, 1.2))
+        contact.move_to(axes.c2p(0.7, 4.5))
         return VGroup(divider, non_contact, contact)
 
     def create_probe(self, axes: Axes) -> Triangle:
         """曲线上工作点标记，初始位于非接触区"""
-        z_start = 2.5
+        z_start = 1.8
         f_start = np.clip(float(self.total_force(z_start)), self.FORCE_RANGE[0], self.FORCE_RANGE[1])
-        probe = Triangle(color=GREY, fill_opacity=1)
+        probe = Triangle(color=GREY, fill_opacity=1).scale(0.6)
         probe.scale(0.15)
         probe.move_to(axes.c2p(z_start, f_start))
         return probe
@@ -261,7 +247,7 @@ class Scene5_ForceCurve(Scene):
     def animate_vibration(self, axes: Axes, probe: Triangle,
                           delta_f: DecimalNumber, duration: float) -> None:
         """工作点沿合力曲线从非接触区移动到接触区"""
-        t = ValueTracker(2.5)
+        t = ValueTracker(1.8)
         z_end = self.EQUILIBRIUM_Z
 
         def update_probe(mob):
@@ -315,8 +301,8 @@ class Scene5_ForceCurve(Scene):
         self.play(Create(vdw_curve), run_time=0.7 * ts)
         self.play(Write(vdw_label), run_time=0.3 * ts)
 
-        # ---- 8. 泡利排斥力曲线 ----
-        pauli_curve, pauli_label = self.create_pauli_curve_group(axes)
+        # ---- 8. Hertz 接触排斥力曲线 ----
+        pauli_curve, pauli_label = self.create_contact_curve_group(axes)
         self.play(Create(pauli_curve), run_time=0.7 * ts)
         self.play(Write(pauli_label), run_time=0.3 * ts)
 
