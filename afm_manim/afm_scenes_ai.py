@@ -1034,11 +1034,8 @@ class Scene6_Cuboid3D(ThreeDScene):
             radius=0.04, color=ORANGE, stroke_width=1.5,
         ).move_to(apex)
 
-        self.add(tip_cone, tip_atom)
-        self.play(
-            Create(orbit),
-            run_time=1.0,
-        )
+        self.add(tip_cone, tip_atom, orbit)
+
 
         # ── 7. 摄像机环绕 ────────────────────────────────────────
         self.move_camera(
@@ -1046,6 +1043,8 @@ class Scene6_Cuboid3D(ThreeDScene):
             run_time=5, rate_func=smooth,
         )
         self.wait(0.5)
+
+        # -- 8. 样品表面上升
 
         # ── 8. 淡出 ──────────────────────────────────────────────
         self.play(

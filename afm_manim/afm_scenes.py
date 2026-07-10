@@ -107,10 +107,13 @@ class Scene5_ForceCurve(Scene):
 
     def force_formula(self) -> MathTex:
         """统一力公式，初始位置在画面右侧"""
+
+        # z+z_s = D
+
         formula = MathTex(
             r"F(z) = \begin{cases} "
-            r"\dfrac{HR}{6(z+z_s)^2}, & z+z_s > a_0 \\[1em] "
-            r"\dfrac{HR}{6a_0^2} + \dfrac{4}{3} E_{\rm eff} \sqrt{R}\, (a_0 - z - z_s)^{3/2}, & z+z_s \leq a_0 "
+            r"\dfrac{HR}{6(D)^2}, & D > a_0 \\[1em] "
+            r"\dfrac{HR}{6a_0^2} + \dfrac{4}{3} E_{\rm eff} \sqrt{R}\, (a_0 - D)^{3/2}, & D \leq a_0 "
             r"\end{cases}",
             font_size=36, color=WHITE
             ).scale(0.8)
