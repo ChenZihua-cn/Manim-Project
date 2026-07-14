@@ -218,22 +218,24 @@ class Scene2_SlaterDeterminant(Scene):
         # 半透明填充 - 先创建静态曲线用于get_area
         cloud1_static = axes.plot(
             lambda x: gaussian(x, tracker1.get_value()),
-            x_range=[-3, 3],
+            x_range=[-2, 2],
             color=COLOR_CLOUD, stroke_width=3
         )
         cloud2_static = axes.plot(
             lambda x: gaussian(x, tracker2.get_value()),
-            x_range=[-3, 3],
+            x_range=[-2, 2],
             color=COLOR_CLOUD, stroke_width=3
         )
-        fill1 = always_redraw(lambda: axes.get_area(
-            cloud1_static, x_range=(-3, 3), opacity=0.4, color=COLOR_CLOUD
-        ))
-        fill2 = always_redraw(lambda: axes.get_area(
-            cloud2_static, x_range=(-3, 3), opacity=0.4, color=COLOR_CLOUD
-        ))
+        
+        fill1 = Circle(radius=0.6, color=RED, fill_opacity=1)
+        fill2 = Circle(radius=0.6, color=RED, fill_opacity=1)
+        fill1.add_updater(lambda m: m.move_to(axes.c2p(tracker1.get_value(), -0.8)))
+        fill2.add_updater(lambda m: m.move_to(axes.c2p(tracker2.get_value(), -0.8)))
         
         self.add(cloud1, cloud2, fill1, fill2)
+        
+        text1 = Text("刚可分辨", font_size=24, color=WHITE).next_to(axes, UP, buff=0.1)
+        text2 = Text("不可分辨", font_size=24, color=WHITE).next_to(axes, UP, buff=0.1)
         
         # 2. 云团缓慢靠近（1-3秒）
         self.play(
@@ -241,7 +243,7 @@ class Scene2_SlaterDeterminant(Scene):
             tracker2.animate.set_value(0.5),
             run_time=2, rate_func=linear
         )
-        
+        """
         # 3. Slater行列式（3-4.5秒）
         slater = MathTex(
             r"\Psi(\mathbf{r}_1,\mathbf{r}_2) = \frac{1}{\sqrt{2}}"
@@ -261,15 +263,23 @@ class Scene2_SlaterDeterminant(Scene):
             font_size=36, color=WHITE
         ).move_to(slater)
         
-        self.play(TransformMatchingTex(slater, expanded), run_time=1.5)
+        self.play(TransformMatchingTex(slater, expanded), run_time=1.5)"""
         
+
+        self.wait(0.1)
+        self.play(Write(text1))
+        self.play(FadeOut(text1))
+
         # 5. 云团继续靠近，出现节点线（6-7.5秒）
         self.play(
             tracker1.animate.set_value(-0.2),
             tracker2.animate.set_value(0.2),
             run_time=1.5, rate_func=linear
         )
-        
+        self.wait(0.1)
+        self.play(Write(text2))
+        self.play(FadeOut(text2))
+        """
         # 节点线
         node_line = DashedLine(
             start=axes.c2p(0, 0), end=axes.c2p(0, 1.5),
@@ -305,13 +315,14 @@ class Scene2_SlaterDeterminant(Scene):
         self.play(Flash(node_line, color=YELLOW), run_time=0.5)
         
         # 8. 保持显示（10.5-13秒）
-        self.wait(2.5)
+        self.wait(2.5)"""
         
         # 清理转场
-        self.play(FadeOut(expanded), FadeOut(spin_label), run_time=0.3)
+        # self.play(FadeOut(expanded), FadeOut(spin_label), run_time=0.3)
         self.play(
             FadeOut(axes), FadeOut(cloud1), FadeOut(cloud2),
-            FadeOut(fill1), FadeOut(fill2), FadeOut(node_line), FadeOut(overlap_region),
+            FadeOut(fill1), FadeOut(fill2),
+            # FadeOut(node_line), FadeOut(overlap_region),
             run_time=0.5
         )
 
