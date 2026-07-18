@@ -583,7 +583,7 @@ class Scene1_4_afm_adjust(Scene):
         tipHolder.move_to(ORIGIN)
         # .next_to(chip, direction=UP, buff=0.015)
 
-        holder_label = Text("探针架 (Tip Holder)", font_size=22, color=WHITE)
+        holder_label = Text("探针架 (Tip Holder)", font_size=28, color=WHITE)
         holder_label.next_to(tipHolder, UP, buff=0.025)
 
         framebox_tipHolder = SurroundingRectangle(tipHolder, color=BLUE, buff=0.1)
@@ -593,11 +593,11 @@ class Scene1_4_afm_adjust(Scene):
         # Scale to match cantilever_edge
         tri_scale = cantilever_edge / np.sqrt(3)
         cantilever_base = Triangle(color=WHITE).rotate(PI).scale(tri_scale)
-        cantilever_covered = Triangle(color=BLACK).rotate(PI).scale(tri_scale*0.3)
+        cantilever_covered = Triangle(color=BLACK).scale(tri_scale*0.05).rotate(PI)
         cantilever = VGroup(cantilever_base, cantilever_covered)
         cantilever.next_to(tipHolder, direction=DOWN, buff=0.01)
 
-        c_label = Text("三角悬臂 (Cantilever)", font_size=22, color=WHITE)
+        c_label = Text("三角悬臂 (Cantilever)", font_size=28, color=WHITE)
         c_label.next_to(cantilever, DOWN, buff=0.2)
 
         framebox_cantilever = SurroundingRectangle(cantilever, color=BLUE, buff=0.15)
@@ -641,7 +641,21 @@ class Scene1_4_afm_adjust(Scene):
         all_geo = VGroup(tipHolder, 
                         # chip, 
                          cantilever)
-        self.play(FadeIn(all_geo), run_time=1.2)
+        self.add(all_geo, holder_label, c_label)
+
+        zoom_center = ORIGIN
+
+        all_geo.generate_target()
+
+        all_geo.target.scale(2.0, about_point= zoom_center)
+
+        self.wait(1)
+        self.play(FadeOut(holder_label, c_label))
+
+        self.play(MoveToTarget(all_geo),run_time= 1)
+        self.play(FadeOut(cantilever), run_time = 0.3)
+
+        """self.play(FadeIn(all_geo), run_time=1.2)
         self.wait(0.4)
 
         # Phase 2: Voiceover-style — highlight each part one by one
@@ -649,21 +663,21 @@ class Scene1_4_afm_adjust(Scene):
         self.play(Create(framebox_tipHolder), Write(holder_label), run_time=1.2)
         self.wait(0.6)
         self.play(FadeOut(framebox_tipHolder), run_time=0.4)
-        """
+        
         # --- Chip ---
         self.play(Create(framebox_chip), Write(chip_label), run_time=1.2)
         self.wait(0.6)
-        self.play(FadeOut(framebox_chip), run_time=0.4)"""
+        self.play(FadeOut(framebox_chip), run_time=0.4)
 
         # --- Cantilever ---
         self.play(Create(framebox_cantilever), Write(c_label), run_time=1.2)
         self.wait(0.6)
-        self.play(FadeOut(framebox_cantilever), run_time=0.4)
+        self.play(FadeOut(framebox_cantilever), run_time=0.4)"""
         
         # --- Laser ---
-        self.add(laser_group)
-        self.play(x.animate.set_value(0.5), run_time=3)
-        self.play(y.animate.set_value(-0.5), run_time=3)
+        self.play(FadeIn(laser_group))
+        self.play(x.animate.set_value(1.5), run_time=3)
+        self.play(y.animate.set_value(-1.5), run_time=3)
 
         # self.play(FadeOut(adjust_note), run_time=0.4)
         """
@@ -682,9 +696,11 @@ class Scene1_4_afm_adjust(Scene):
 
         # Phase 7: Fade out everything
         self.play(
-            FadeOut(tipHolder), FadeOut(holder_label),
+            FadeOut(tipHolder), 
+            # FadeOut(holder_label),
             # FadeOut(chip), FadeOut(chip_label),
-            FadeOut(cantilever), FadeOut(c_label),
+            # FadeOut(cantilever),
+            # FadeOut(c_label),
             # FadeOut(chip_annotation), FadeOut(dim_label),
             FadeOut(laser_group),
             # FadeOut(block_note),
@@ -1722,7 +1738,7 @@ class Scene3_3_afm_adjust(Scene):
         ).shift(ArmShift*(LEFT+DOWN))
 
         cantilever_group = VGroup(left_arm, right_arm)
-        cantilever_label = Text("V型悬臂 (放大)", font_size=24, color=WHITE)
+        cantilever_label = Text("V型悬臂 (放大)", font_size=30, color=WHITE)
         cantilever_label.next_to(cantilever_group, UP, buff=0.5)
 
         # ---- Position dots A-J along the V ----
@@ -1796,12 +1812,12 @@ class Scene3_3_afm_adjust(Scene):
         paper = Rectangle(width=1.8, height=2.2, color=COLOR_PAPER,
                          fill_opacity=0.9, stroke_width=2)
         paper.move_to(np.array([4.2, -0.3, 0]))
-        paper_label = Text("白纸 / 光屏", font_size=20, color=BLACK)
+        paper_label = Text("白纸 / 光屏", font_size=24, color=BLACK)
         paper_label.next_to(paper, UP, buff=0.15)
         # Spot patterns on paper (created dynamically per position)
 
         # No-spot indicator
-        no_spot_text = Text("无光斑", font_size=22, color=BLACK)
+        no_spot_text = Text("无光斑", font_size=24, color=BLACK)
         no_spot_text.move_to(paper.get_center())
 
         # ---- Laser scanning dot ----
@@ -1818,16 +1834,16 @@ class Scene3_3_afm_adjust(Scene):
         self.play(FadeIn(cantilever_group), Write(cantilever_label), run_time=0.5)
 
         # Draw position labels
-        self.play(FadeIn(all_dots), Write(all_labels), run_time=0.5)
+        self.play(FadeIn(all_dots), Write(all_labels), run_time=0.9)
         self.wait(0.3)
 
         # Draw paper screen
-        self.play(FadeIn(paper), Write(paper_label), run_time=0.5)
+        self.play(FadeIn(paper), Write(paper_label), run_time=0.9)
 
         # Title
-        scan_title = Text("激光扫描悬臂校准", font_size=28, color=WHITE)
+        scan_title = Text("激光扫描悬臂校准", font_size=32, color=WHITE)
         scan_title.to_edge(UP, buff=0.3)
-        self.play(Write(scan_title), run_time=0.8)
+        self.play(Write(scan_title), run_time=0.9)
         self.play(FadeIn(laser_group), run_time=0.5)
 
         trace = TracedPath(laser_dot.get_center, stroke_color=YELLOW, stroke_width=2)
